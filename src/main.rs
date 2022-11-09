@@ -1,6 +1,9 @@
 mod lexer;
 mod repl;
 mod token;
+mod ast;
+mod parser;
+
 use std::env;
 
 use repl::repl::*;
