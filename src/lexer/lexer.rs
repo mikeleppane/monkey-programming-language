@@ -1,8 +1,4 @@
-use crate::token::token::TokenType::INT;
-use crate::token::token::{
-    lookup_ident, Token, TokenType, ASSIGN, COMMA, EMPTY, LBRACE, LPAREN, PLUS, RBRACE, RPAREN,
-    SEMICOLON,
-};
+use crate::token::token::*;
 
 struct Lexer {
     input: String,
@@ -58,6 +54,48 @@ impl Lexer {
                     literal: ASSIGN.to_string(),
                 }
             }
+            PLUS => {
+                tok = Token {
+                    r#type: TokenType::PLUS,
+                    literal: PLUS.to_string(),
+                }
+            }
+            MINUS => {
+                tok = Token {
+                    r#type: TokenType::MINUS,
+                    literal: MINUS.to_string(),
+                }
+            }
+            BANG => {
+                tok = Token {
+                    r#type: TokenType::BANG,
+                    literal: BANG.to_string(),
+                }
+            }
+            SLASH => {
+                tok = Token {
+                    r#type: TokenType::SLASH,
+                    literal: SLASH.to_string(),
+                }
+            }
+            ASTERISK => {
+                tok = Token {
+                    r#type: TokenType::ASTERISK,
+                    literal: ASTERISK.to_string(),
+                }
+            }
+            LT => {
+                tok = Token {
+                    r#type: TokenType::LT,
+                    literal: LT.to_string(),
+                }
+            }
+            GT => {
+                tok = Token {
+                    r#type: TokenType::GT,
+                    literal: GT.to_string(),
+                }
+            }
             SEMICOLON => {
                 tok = Token {
                     r#type: TokenType::SEMICOLON,
@@ -82,12 +120,6 @@ impl Lexer {
                     literal: COMMA.to_string(),
                 }
             }
-            PLUS => {
-                tok = Token {
-                    r#type: TokenType::PLUS,
-                    literal: PLUS.to_string(),
-                }
-            }
             LBRACE => {
                 tok = Token {
                     r#type: TokenType::LBRACE,
@@ -107,7 +139,7 @@ impl Lexer {
                     tok.r#type = lookup_ident(tok.literal.as_str());
                     return tok;
                 } else if is_digit(self.ch.as_str()) {
-                    tok.r#type = INT;
+                    tok.r#type = TokenType::INT;
                     tok.literal = self.read_number();
                     return tok;
                 } else {
@@ -155,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_next_token_with_basic_token_types() {
-        let test_input = "=+(){},;";
+        let test_input = "=+(){},;-/*<>";
         let inputs = vec![
             (TokenType::ASSIGN, "="),
             (TokenType::PLUS, "+"),
@@ -165,7 +197,11 @@ mod tests {
             (TokenType::RBRACE, "}"),
             (TokenType::COMMA, ","),
             (TokenType::SEMICOLON, ";"),
-            (TokenType::EMPTY, ""),
+            (TokenType::MINUS, "-"),
+            (TokenType::SLASH, "/"),
+            (TokenType::ASTERISK, "*"),
+            (TokenType::LT, "<"),
+            (TokenType::GT, ">"),
         ];
         let mut lexer = Lexer::new(test_input);
         for (token_type, literal) in inputs.iter() {
@@ -184,6 +220,14 @@ mod tests {
         }; \
         \
         let result = add(five, ten);\
+        !-/*5;\
+        5 < 10 > 5; \
+        \
+        if (5 < 10) {\
+            return true;\
+        } else {\
+            return false;\
+        }\
         ";
         let inputs = vec![
             (TokenType::LET, "let"),
@@ -222,6 +266,35 @@ mod tests {
             (TokenType::IDENT, "ten"),
             (TokenType::RPAREN, ")"),
             (TokenType::SEMICOLON, ";"),
+            (TokenType::BANG, "!"),
+            (TokenType::MINUS, "-"),
+            (TokenType::SLASH, "/"),
+            (TokenType::ASTERISK, "*"),
+            (TokenType::INT, "5"),
+            (TokenType::SEMICOLON, ";"),
+            (TokenType::INT, "5"),
+            (TokenType::LT, "<"),
+            (TokenType::INT, "10"),
+            (TokenType::GT, ">"),
+            (TokenType::INT, "5"),
+            (TokenType::SEMICOLON, ";"),
+            (TokenType::IF, "if"),
+            (TokenType::LPAREN, "("),
+            (TokenType::INT, "5"),
+            (TokenType::LT, "<"),
+            (TokenType::INT, "10"),
+            (TokenType::RPAREN, ")"),
+            (TokenType::LBRACE, "{"),
+            (TokenType::RETURN, "return"),
+            (TokenType::TRUE, "true"),
+            (TokenType::SEMICOLON, ";"),
+            (TokenType::RBRACE, "}"),
+            (TokenType::ELSE, "else"),
+            (TokenType::LBRACE, "{"),
+            (TokenType::RETURN, "return"),
+            (TokenType::FALSE, "false"),
+            (TokenType::SEMICOLON, ";"),
+            (TokenType::RBRACE, "}"),
             (TokenType::EMPTY, ""),
         ];
         let mut lexer = Lexer::new(test_input);

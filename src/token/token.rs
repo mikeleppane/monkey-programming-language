@@ -33,12 +33,28 @@ pub enum TokenType {
     FUNCTION,
     LET,
     EMPTY,
+    MINUS,
+    BANG,
+    ASTERISK,
+    SLASH,
+    LT,
+    GT,
+    TRUE,
+    FALSE,
+    IF,
+    ELSE,
+    RETURN,
 }
 
 pub fn lookup_ident(ident: &str) -> TokenType {
     match ident {
         "fn" => TokenType::FUNCTION,
         "let" => TokenType::LET,
+        "true" => TokenType::TRUE,
+        "false" => TokenType::FALSE,
+        "if" => TokenType::IF,
+        "else" => TokenType::ELSE,
+        "return" => TokenType::RETURN,
         _ => TokenType::IDENT,
     }
 }
@@ -59,3 +75,9 @@ pub const RBRACE: &str = "}";
 pub const FUNCTION: &str = "FUNCTION";
 pub const LET: &str = "LET";
 pub const EMPTY: &str = "";
+pub const MINUS: &str = "-";
+pub const BANG: &str = "!";
+pub const ASTERISK: &str = "*";
+pub const SLASH: &str = "/";
+pub const LT: &str = "<";
+pub const GT: &str = ">";
