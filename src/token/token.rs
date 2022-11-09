@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(non_camel_case_types)]
 
 use std::string::ToString;
 #[derive(PartialEq, Eq, Debug)]
@@ -44,6 +45,8 @@ pub enum TokenType {
     IF,
     ELSE,
     RETURN,
+    EQ,
+    NOT_EQ,
 }
 
 pub fn lookup_ident(ident: &str) -> TokenType {
@@ -81,3 +84,5 @@ pub const ASTERISK: &str = "*";
 pub const SLASH: &str = "/";
 pub const LT: &str = "<";
 pub const GT: &str = ">";
+pub const EQ: &str = "==";
+pub const NOT_EQ: &str = "!=";
