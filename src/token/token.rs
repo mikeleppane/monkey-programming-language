@@ -2,7 +2,7 @@
 #![allow(non_camel_case_types)]
 
 use std::string::ToString;
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Token {
     pub(crate) r#type: TokenType,
     pub(crate) literal: String,
@@ -17,7 +17,7 @@ impl Token {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum TokenType {
     ASSIGN,
     SEMICOLON,

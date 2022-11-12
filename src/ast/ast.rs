@@ -4,27 +4,28 @@ trait Node {
     fn token_literal(&self) -> String;
 }
 
-trait Statement {
+pub trait Statement {
     fn token_literal(&self) -> String;
+    fn identifier(&self) -> Option<Identifier>;
     fn statement_node(&self);
 }
 
-trait Expression {
+pub trait Expression {
     fn expression_node(&self);
     fn token_literal(&self) -> String;
 }
 
-struct Program<T: Statement> {
-    statements: Vec<T>,
+pub struct Program {
+    pub(crate) statements: Vec<Box<dyn Statement>>,
 }
 
-impl<T: Statement> Node for Program<T> {
+impl Node for Program {
     fn token_literal(&self) -> String {
         todo!()
     }
 }
 
-impl<T: Statement> Statement for Program<T> {
+impl Statement for Program {
     fn token_literal(&self) -> String {
         if !self.statements.is_empty() {
             self.statements[0].token_literal()
@@ -33,14 +34,29 @@ impl<T: Statement> Statement for Program<T> {
         }
     }
 
+    fn identifier(&self) -> Option<Identifier> {
+        if !self.statements.is_empty() {
+            self.statements[0].identifier().clone()
+        } else {
+            None
+        }
+    }
+
     fn statement_node(&self) {
         todo!()
     }
 }
 
-struct Identifier {
-    token: Token,
-    value: String,
+#[derive(Debug, Clone)]
+pub struct Identifier {
+    pub token: Token,
+    pub value: String,
+}
+
+impl Identifier {
+    pub fn new(token: Token, value: String) -> Self {
+        Self { token, value }
+    }
 }
 
 impl Expression for Identifier {
@@ -50,15 +66,28 @@ impl Expression for Identifier {
     }
 }
 
-struct LetStatement {
-    token: Token,
-    name: Identifier,
-    value: Box<dyn Expression>,
+pub struct LetStatement {
+    pub token: Token,
+    pub name: Identifier,
+    pub value: Box<dyn Expression>,
+}
+
+impl LetStatement {
+    pub fn new(token: Token) -> Self {
+        Self {
+            token,
+            name: Identifier::new(Token::new(), "".to_string()),
+            value: Box::new(Identifier::new(Token::new(), "".to_string())),
+        }
+    }
 }
 
 impl Statement for LetStatement {
     fn token_literal(&self) -> String {
         self.token.literal.clone()
+    }
+    fn identifier(&self) -> Option<Identifier> {
+        Some(self.name.clone())
     }
     fn statement_node(&self) {}
 }
