@@ -91,3 +91,27 @@ impl Statement for LetStatement {
     }
     fn statement_node(&self) {}
 }
+
+pub struct ReturnStatement {
+    token: Token,
+    return_value: Box<dyn Expression>,
+}
+
+impl ReturnStatement {
+    pub fn new(token: Token) -> Self {
+        Self {
+            token,
+            return_value: Box::new(Identifier::new(Token::new(), "".to_string())),
+        }
+    }
+}
+
+impl Statement for ReturnStatement {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+    fn identifier(&self) -> Option<Identifier> {
+        None
+    }
+    fn statement_node(&self) {}
+}

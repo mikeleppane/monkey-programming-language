@@ -1,6 +1,6 @@
 use crate::ast::ast::*;
 use crate::lexer::lexer::*;
-use crate::token::token::TokenType::{EMPTY, IDENT};
+use crate::token::token::TokenType::{EMPTY, IDENT, SEMICOLON};
 use crate::token::token::*;
 
 struct Parser {
@@ -50,6 +50,12 @@ impl Parser {
                 }
                 return None;
             }
+            TokenType::RETURN => {
+                if let Some(x) = self.parse_return_statement() {
+                    return Some(Box::new(x));
+                }
+                return None;
+            }
             _ => None,
         }
     }
@@ -70,6 +76,16 @@ impl Parser {
         }
 
         if !self.current_token_matches(TokenType::SEMICOLON) {
+            self.next_token();
+        }
+        Some(statement)
+    }
+
+    fn parse_return_statement(&mut self) -> Option<ReturnStatement> {
+        let statement = ReturnStatement::new(self.current_token.clone());
+        self.next_token();
+
+        while !self.current_token_matches(SEMICOLON) {
             self.next_token();
         }
         Some(statement)
@@ -183,5 +199,26 @@ mod tests {
         parser.parse_program();
         check_parser_errors(&parser);
         assert_eq!(parser.errors().len(), 3);
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let test_input = "return 5;\
+        return 10;\
+        return 993322;\
+        ";
+        let lexer = Lexer::new(test_input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+        assert_eq!(parser.errors().len(), 0);
+        assert_eq!(
+            program.statements.len(),
+            3,
+            "There should be exactly three program statements"
+        );
+        for statement in program.statements {
+            assert_eq!(statement.token_literal(), "return")
+        }
     }
 }
