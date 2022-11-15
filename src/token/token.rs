@@ -11,7 +11,7 @@ pub struct Token {
 impl Token {
     pub(crate) fn new() -> Self {
         Token {
-            r#type: TokenType::EMPTY,
+            r#type: TokenType::Empty,
             literal: EMPTY.to_string(),
         }
     }
@@ -19,46 +19,46 @@ impl Token {
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum TokenType {
-    ASSIGN,
-    SEMICOLON,
-    ILLEGAL,
-    EOF,
-    IDENT,
-    INT,
-    PLUS,
-    COMMA,
-    LPAREN,
-    RPAREN,
-    LBRACE,
-    RBRACE,
-    FUNCTION,
-    LET,
-    EMPTY,
-    MINUS,
-    BANG,
-    ASTERISK,
-    SLASH,
+    Assign,
+    Semicolon,
+    Illegal,
+    Eof,
+    Ident,
+    Int,
+    Plus,
+    Comma,
+    Lparen,
+    Rparen,
+    Lbrace,
+    Rbrace,
+    Function,
+    Let,
+    Empty,
+    Minus,
+    Bang,
+    Asterisk,
+    Slash,
     LT,
     GT,
-    TRUE,
-    FALSE,
+    True,
+    False,
     IF,
-    ELSE,
-    RETURN,
+    Else,
+    Return,
     EQ,
     NOT_EQ,
 }
 
 pub fn lookup_ident(ident: &str) -> TokenType {
     match ident {
-        "fn" => TokenType::FUNCTION,
-        "let" => TokenType::LET,
-        "true" => TokenType::TRUE,
-        "false" => TokenType::FALSE,
+        "fn" => TokenType::Function,
+        "let" => TokenType::Let,
+        "true" => TokenType::True,
+        "false" => TokenType::False,
         "if" => TokenType::IF,
-        "else" => TokenType::ELSE,
-        "return" => TokenType::RETURN,
-        _ => TokenType::IDENT,
+        "else" => TokenType::Else,
+        "return" => TokenType::Return,
+        _ => TokenType::Ident,
     }
 }
 

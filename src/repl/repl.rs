@@ -1,5 +1,5 @@
 use crate::lexer::lexer::*;
-use crate::token::token::TokenType::EMPTY;
+use crate::token::token::TokenType::Empty;
 use std::io;
 use std::io::prelude::*;
 
@@ -18,7 +18,7 @@ pub fn start() {
         let mut lexer = Lexer::new(&line);
         loop {
             let tok = lexer.next_token();
-            if tok.r#type == EMPTY {
+            if tok.r#type == Empty {
                 break;
             }
             println!("{:#?}", tok);

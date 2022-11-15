@@ -1,6 +1,6 @@
 use crate::ast::ast::*;
 use crate::lexer::lexer::*;
-use crate::token::token::TokenType::{EMPTY, IDENT, SEMICOLON};
+use crate::token::token::TokenType::{Empty, Ident, Semicolon};
 use crate::token::token::*;
 
 struct Parser {
@@ -32,7 +32,7 @@ impl Parser {
         let mut program = Program {
             statements: Vec::new(),
         };
-        while !self.current_token_matches(EMPTY) {
+        while !self.current_token_matches(Empty) {
             let statement = self.parse_statement();
             if let Some(x) = statement {
                 program.statements.push(x)
@@ -44,17 +44,17 @@ impl Parser {
 
     fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
         match self.current_token.r#type {
-            TokenType::LET => {
+            TokenType::Let => {
                 if let Some(x) = self.parse_let_statement() {
                     return Some(Box::new(x));
                 }
-                return None;
+                None
             }
-            TokenType::RETURN => {
+            TokenType::Return => {
                 if let Some(x) = self.parse_return_statement() {
                     return Some(Box::new(x));
                 }
-                return None;
+                None
             }
             _ => None,
         }
@@ -63,7 +63,7 @@ impl Parser {
     fn parse_let_statement(&mut self) -> Option<LetStatement> {
         let mut statement = LetStatement::new(self.current_token.clone());
 
-        if !self.expect_peek(&IDENT) {
+        if !self.expect_peek(&Ident) {
             return None;
         }
         statement.name = Identifier::new(
@@ -71,11 +71,11 @@ impl Parser {
             self.current_token.literal.clone(),
         );
 
-        if !self.expect_peek(&TokenType::ASSIGN) {
+        if !self.expect_peek(&TokenType::Assign) {
             return None;
         }
 
-        if !self.current_token_matches(TokenType::SEMICOLON) {
+        if !self.current_token_matches(TokenType::Semicolon) {
             self.next_token();
         }
         Some(statement)
@@ -85,7 +85,7 @@ impl Parser {
         let statement = ReturnStatement::new(self.current_token.clone());
         self.next_token();
 
-        while !self.current_token_matches(SEMICOLON) {
+        while !self.current_token_matches(Semicolon) {
             self.next_token();
         }
         Some(statement)
@@ -100,7 +100,7 @@ impl Parser {
     }
 
     fn expect_peek(&mut self, token: &TokenType) -> bool {
-        match self.peek_token_matches(&token) {
+        match self.peek_token_matches(token) {
             true => {
                 self.next_token();
                 true
@@ -139,18 +139,19 @@ mod tests {
             return false;
         }
         let identifier = statement.identifier().unwrap();
-        if identifier.value != name {
+        if identifier.value() != name {
             eprintln!(
                 "Identifier's value is not {}! Got {}",
-                name, identifier.value
+                name,
+                identifier.value()
             );
             return false;
         }
-        if identifier.token_literal() != name {
+        if statement.token_literal() != name {
             eprintln!(
                 "Identifier's token literal is not {}! Got {}",
                 name,
-                identifier.token_literal()
+                statement.token_literal()
             );
             return false;
         }
