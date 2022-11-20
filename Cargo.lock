@@ -9,10 +9,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "216261ddc8289130e551ddcd5ce8a064710c0d064a4d2895c67151c92b5443f6"
 
 [[package]]
+name = "collections_macros"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1772d4728b0b03085b0ffa20f5b39d87ca0e17a1d07edc3fc1002ad778642ab"
+
+[[package]]
 name = "monkey-programming-language"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "collections_macros",
  "thiserror",
 ]
 

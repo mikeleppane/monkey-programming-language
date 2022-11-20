@@ -150,11 +150,11 @@ impl Lexer {
             }
             EMPTY => {}
             _ => {
-                if is_letter(self.ch.as_str()) {
+                if is_letter(&self.ch) {
                     tok.literal = self.read_identifier();
-                    tok.r#type = lookup_ident(tok.literal.as_str());
+                    tok.r#type = lookup_ident(&tok.literal);
                     return tok;
-                } else if is_digit(self.ch.as_str()) {
+                } else if is_digit(&self.ch) {
                     tok.r#type = TokenType::Int;
                     tok.literal = self.read_number();
                     return tok;
@@ -175,31 +175,31 @@ impl Lexer {
         while is_letter(self.ch.as_str()) {
             self.read_char();
         }
-        self.input.as_str()[position..self.position].to_string()
+        self.input[position..self.position].to_string()
     }
 
     fn skip_whitespace(&mut self) {
         fn is_whitespace(ch: &str) -> bool {
             ch == " " || ch == "\t" || ch == "\n" || ch == "\r"
         }
-        while is_whitespace(self.ch.as_str()) {
+        while is_whitespace(&self.ch) {
             self.read_char()
         }
     }
 
     fn read_number(&mut self) -> String {
         let position = self.position;
-        while is_digit(self.ch.as_str()) {
+        while is_digit(&self.ch) {
             self.read_char();
         }
-        self.input.as_str()[position..self.position].to_string()
+        self.input[position..self.position].to_string()
     }
 
-    fn peek_char(&self) -> String {
+    fn peek_char(&self) -> &str {
         if self.read_position >= self.input.len() {
-            String::from("")
+            ""
         } else {
-            self.input.as_str()[self.read_position..self.read_position + 1].to_string()
+            &self.input[self.read_position..self.read_position + 1]
         }
     }
 }

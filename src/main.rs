@@ -1,8 +1,10 @@
+extern crate core;
+
+mod ast;
 mod lexer;
+mod parser;
 mod repl;
 mod token;
-mod ast;
-mod parser;
 
 use std::env;
 

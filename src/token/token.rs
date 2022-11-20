@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
-
 use std::string::ToString;
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Token {
@@ -17,7 +16,7 @@ impl Token {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub enum TokenType {
     Assign,
     Semicolon,

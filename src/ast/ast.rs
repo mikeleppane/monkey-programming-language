@@ -1,67 +1,63 @@
 use crate::token::token::*;
+use std::any::Any;
+use std::fmt;
 
-trait Node {
-    fn token_literal(&self) -> String;
-}
-
-pub trait Identifiable {
-    fn value(&self) -> String;
-    fn token(&self) -> Token;
+#[derive(PartialEq, Eq, Debug)]
+pub enum AstType {
+    Let,
+    Return,
+    ExprStatement,
+    Int,
+    Prefix,
+    Identifier,
 }
 
 pub trait Statement {
-    fn token_literal(&self) -> String;
-    fn identifier(&self) -> Option<&dyn Identifiable>;
+    fn token_literal(&self) -> &str;
     fn statement_node(&self);
     fn to_string(&self) -> String;
+    fn get_type(&self) -> AstType;
+    fn as_any(&self) -> &dyn Any;
 }
 
 pub trait Expression {
     fn expression_node(&self);
-    fn token_literal(&self) -> String;
+    fn token_literal(&self) -> &str;
+    fn get_type(&self) -> AstType;
+    fn to_string(&self) -> String;
+    fn as_any(&self) -> &dyn Any;
 }
 
 pub struct Program {
-    pub(crate) statements: Vec<Box<dyn Statement>>,
+    pub statements: Vec<Box<dyn Statement>>,
 }
 
-impl Node for Program {
-    fn token_literal(&self) -> String {
-        todo!()
-    }
-}
-
-impl Statement for Program {
-    fn token_literal(&self) -> String {
+#[allow(dead_code)]
+impl Program {
+    fn token_literal(&self) -> &str {
         if !self.statements.is_empty() {
             self.statements[0].token_literal()
         } else {
-            String::from("")
+            ""
         }
-    }
-
-    fn identifier(&self) -> Option<&dyn Identifiable> {
-        if !self.statements.is_empty() {
-            self.statements[0].identifier()
-        } else {
-            None
-        }
-    }
-
-    fn statement_node(&self) {
-        todo!()
-    }
-
-    fn to_string(&self) -> String {
-        self.statements
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>()
-            .join("")
     }
 }
 
-#[derive(Debug, Clone)]
+impl fmt::Display for Program {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.statements
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .join("")
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier {
     pub token: Token,
     pub value: String,
@@ -72,46 +68,31 @@ impl Identifier {
     pub fn new(token: Token, value: String) -> Self {
         Self { token, value }
     }
-    pub fn value(&self) -> String {
-        self.value.clone()
-    }
 }
 
 impl Expression for Identifier {
     fn expression_node(&self) {}
-    fn token_literal(&self) -> String {
-        self.token.literal.clone()
-    }
-}
 
-impl Statement for Identifier {
-    fn token_literal(&self) -> String {
-        self.token.literal.clone()
+    fn token_literal(&self) -> &str {
+        &self.token.literal
     }
-    fn identifier(&self) -> Option<&dyn Identifiable> {
-        None
+    fn get_type(&self) -> AstType {
+        AstType::Identifier
     }
-    fn statement_node(&self) {}
 
     fn to_string(&self) -> String {
         self.value.clone()
     }
-}
 
-impl Identifiable for Identifier {
-    fn value(&self) -> String {
-        self.value.clone()
-    }
-
-    fn token(&self) -> Token {
-        self.token.clone()
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
 pub struct LetStatement {
-    pub token: Token,
+    token: Token,
     pub name: Identifier,
-    pub value: Box<dyn Statement>,
+    pub value: Box<dyn Expression>,
 }
 
 impl LetStatement {
@@ -125,17 +106,14 @@ impl LetStatement {
 }
 
 impl Statement for LetStatement {
-    fn token_literal(&self) -> String {
-        self.token.literal.clone()
-    }
-    fn identifier(&self) -> Option<&dyn Identifiable> {
-        Some(&self.name)
+    fn token_literal(&self) -> &str {
+        &self.token.literal
     }
     fn statement_node(&self) {}
 
     fn to_string(&self) -> String {
         let mut string = "".to_string();
-        string.push_str(self.token_literal().as_str());
+        string.push_str(self.token_literal());
         string.push(' ');
         string.push_str(self.name.to_string().as_str());
         string.push_str(" = ");
@@ -143,11 +121,18 @@ impl Statement for LetStatement {
         string.push(';');
         string
     }
+    fn get_type(&self) -> AstType {
+        AstType::Let
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 pub struct ReturnStatement {
     token: Token,
-    return_value: Box<dyn Statement>,
+    return_value: Box<dyn Expression>,
 }
 
 impl ReturnStatement {
@@ -160,50 +145,134 @@ impl ReturnStatement {
 }
 
 impl Statement for ReturnStatement {
-    fn token_literal(&self) -> String {
-        self.token.literal.clone()
-    }
-    fn identifier(&self) -> Option<&dyn Identifiable> {
-        None
+    fn token_literal(&self) -> &str {
+        &self.token.literal
     }
     fn statement_node(&self) {}
-
     fn to_string(&self) -> String {
         let mut string = "".to_string();
-        string.push_str(self.token_literal().as_str());
+        string.push_str(self.token_literal());
         string.push(' ');
         string.push_str(self.return_value.to_string().as_str());
         string.push(';');
         string
     }
+    fn get_type(&self) -> AstType {
+        AstType::Return
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 pub struct ExpressionStatement {
     token: Token,
-    expression: Box<dyn Statement>,
+    pub expression: Option<Box<dyn Expression>>,
 }
 
 #[allow(dead_code)]
 impl ExpressionStatement {
-    pub fn new(token: Token) -> Self {
-        Self {
-            token,
-            expression: Box::new(Identifier::new(Token::new(), "".to_string())),
-        }
+    pub fn new(token: Token, expression: Option<Box<dyn Expression>>) -> Self {
+        Self { token, expression }
     }
 }
 
 impl Statement for ExpressionStatement {
-    fn token_literal(&self) -> String {
-        self.token.literal.clone()
+    fn token_literal(&self) -> &str {
+        &self.token.literal
     }
-    fn identifier(&self) -> Option<&dyn Identifiable> {
-        self.expression.identifier()
+
+    fn statement_node(&self) {
+        todo!()
     }
-    fn statement_node(&self) {}
+    fn to_string(&self) -> String {
+        let mut string = "".to_string();
+        string.push_str(self.token_literal());
+        string
+    }
+
+    fn get_type(&self) -> AstType {
+        AstType::ExprStatement
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+pub struct IntegerLiteral {
+    token: Token,
+    pub value: i64,
+}
+
+impl IntegerLiteral {
+    pub fn new(token: Token, value: i64) -> Self {
+        Self { token, value }
+    }
+}
+
+impl Expression for IntegerLiteral {
+    fn expression_node(&self) {
+        todo!()
+    }
+
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn get_type(&self) -> AstType {
+        AstType::Int
+    }
 
     fn to_string(&self) -> String {
-        self.expression.to_string()
+        self.token.literal.to_string()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+pub struct PrefixExpression {
+    token: Token,
+    pub operator: String,
+    pub(crate) right: Option<Box<dyn Expression>>,
+}
+
+impl PrefixExpression {
+    pub fn new(token: Token, operator: &str, right: Option<Box<dyn Expression>>) -> Self {
+        Self {
+            token,
+            operator: operator.to_string(),
+            right,
+        }
+    }
+}
+
+impl Expression for PrefixExpression {
+    fn expression_node(&self) {
+        todo!()
+    }
+
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn get_type(&self) -> AstType {
+        AstType::Prefix
+    }
+
+    fn to_string(&self) -> String {
+        let mut string = "(".to_string();
+        string.push_str(self.operator.as_str());
+        string.push_str(self.right.as_ref().unwrap().to_string().as_str());
+        string.push(')');
+        string
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
