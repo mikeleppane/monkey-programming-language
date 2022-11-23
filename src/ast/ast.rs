@@ -9,6 +9,7 @@ pub enum AstType {
     ExprStatement,
     Int,
     Prefix,
+    Infix,
     Identifier,
 }
 
@@ -188,7 +189,9 @@ impl Statement for ExpressionStatement {
     }
     fn to_string(&self) -> String {
         let mut string = "".to_string();
-        string.push_str(self.token_literal());
+        //string.push_str(self.token_literal());
+        string.push_str(self.expression.as_ref().unwrap().to_string().as_str());
+        string.push(' ');
         string
     }
 
@@ -265,6 +268,56 @@ impl Expression for PrefixExpression {
 
     fn to_string(&self) -> String {
         let mut string = "(".to_string();
+        string.push_str(self.operator.as_str());
+        string.push_str(self.right.as_ref().unwrap().to_string().as_str());
+        string.push(')');
+        string
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+pub struct InfixExpression {
+    token: Token,
+    pub left: Box<dyn Expression>,
+    pub operator: String,
+    pub right: Option<Box<dyn Expression>>,
+}
+
+impl InfixExpression {
+    pub fn new(
+        token: Token,
+        left: Box<dyn Expression>,
+        operator: &str,
+        right: Option<Box<dyn Expression>>,
+    ) -> Self {
+        Self {
+            token,
+            left,
+            operator: operator.to_string(),
+            right,
+        }
+    }
+}
+
+impl Expression for InfixExpression {
+    fn expression_node(&self) {
+        todo!()
+    }
+
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn get_type(&self) -> AstType {
+        AstType::Infix
+    }
+
+    fn to_string(&self) -> String {
+        let mut string = "(".to_string();
+        string.push_str(self.left.as_ref().to_string().as_str());
         string.push_str(self.operator.as_str());
         string.push_str(self.right.as_ref().unwrap().to_string().as_str());
         string.push(')');
