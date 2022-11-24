@@ -1,17 +1,117 @@
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
-use std::string::ToString;
+
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::str::FromStr;
+
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct Token {
-    pub(crate) r#type: TokenType,
-    pub(crate) literal: String,
+pub enum Token {
+    Assign(String),
+    Semicolon(String),
+    Illegal(String),
+    Eof(String),
+    Ident(String),
+    Int(String),
+    Plus(String),
+    Comma(String),
+    Lparen(String),
+    Rparen(String),
+    Lbrace(String),
+    Rbrace(String),
+    Function(String),
+    Let(String),
+    Empty(String),
+    Minus(String),
+    Bang(String),
+    Asterisk(String),
+    Slash(String),
+    LT(String),
+    GT(String),
+    True(String),
+    False(String),
+    IF(String),
+    Else(String),
+    Return(String),
+    EQ(String),
+    NOT_EQ(String), //pub(crate) r#type: TokenType,
+                    //pub(crate) literal: String,
+}
+
+impl FromStr for Token {
+    type Err = String;
+
+    fn from_str(input: &str) -> Result<Token, Self::Err> {
+        match input {
+            "=" => Ok(Token::Assign("=".to_string())),
+            "let" => Ok(Token::Let("let".to_string())),
+            "" => Ok(Token::Empty("".to_string())),
+            ";" => Ok(Token::Semicolon(";".to_string())),
+            _ => Err(format!(
+                "Could not construct Token from the given string: {}",
+                input
+            )),
+        }
+    }
 }
 
 impl Token {
-    pub(crate) fn new() -> Self {
-        Token {
-            r#type: TokenType::Empty,
-            literal: EMPTY.to_string(),
+    pub(crate) fn lookup_ident(ident: &str) -> Token {
+        match ident {
+            "fn" => Token::Function("fn".to_string()),
+            "let" => Token::Let("let".to_string()),
+            "true" => Token::True("true".to_string()),
+            "false" => Token::False("false".to_string()),
+            "if" => Token::IF("if".to_string()),
+            "else" => Token::Else("else".to_string()),
+            "return" => Token::Return("return".to_string()),
+            _ => Token::Ident(ident.to_string()),
+        }
+    }
+
+    pub(crate) fn literal(&self) -> &str {
+        match self {
+            Token::Assign(s) => s,
+            Token::Semicolon(s) => s,
+            Token::Illegal(s) => s,
+            Token::Eof(s) => s,
+            Token::Ident(s) => s,
+            Token::Int(s) => s,
+            Token::Plus(s) => s,
+            Token::Minus(s) => s,
+            Token::Comma(s) => s,
+            Token::Lparen(s) => s,
+            Token::Rparen(s) => s,
+            Token::Lbrace(s) => s,
+            Token::Rbrace(s) => s,
+            Token::Function(s) => s,
+            Token::Let(s) => s,
+            Token::Empty(s) => s,
+            Token::True(s) => s,
+            Token::False(s) => s,
+            Token::Bang(s) => s,
+            Token::Asterisk(s) => s,
+            Token::Slash(s) => s,
+            Token::LT(s) => s,
+            Token::GT(s) => s,
+            Token::EQ(s) => s,
+            Token::NOT_EQ(s) => s,
+            Token::IF(s) => s,
+            Token::Else(s) => s,
+            Token::Return(s) => s,
+        }
+    }
+
+    pub(crate) fn matches(&self, token: &Token) -> bool {
+        match self {
+            Token::Ident(_) => {
+                return match token {
+                    Token::Ident(_) => true,
+                    _ => false,
+                }
+            }
+
+            _ => token == self,
         }
     }
 }

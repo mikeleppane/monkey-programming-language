@@ -75,7 +75,7 @@ impl Expression for Identifier {
     fn expression_node(&self) {}
 
     fn token_literal(&self) -> &str {
-        &self.token.literal
+        self.token.literal()
     }
     fn get_type(&self) -> AstType {
         AstType::Identifier
@@ -100,15 +100,21 @@ impl LetStatement {
     pub fn new(token: Token) -> Self {
         Self {
             token,
-            name: Identifier::new(Token::new(), "".to_string()),
-            value: Box::new(Identifier::new(Token::new(), "".to_string())),
+            name: Identifier::new(
+                Token::Empty("".to_string()),
+                "".to_string(), /* std::string::String */
+            ),
+            value: Box::new(Identifier::new(
+                Token::Empty("".to_string()),
+                "".to_string(), /* std::string::String */
+            )),
         }
     }
 }
 
 impl Statement for LetStatement {
     fn token_literal(&self) -> &str {
-        &self.token.literal
+        self.token.literal()
     }
     fn statement_node(&self) {}
 
@@ -140,14 +146,17 @@ impl ReturnStatement {
     pub fn new(token: Token) -> Self {
         Self {
             token,
-            return_value: Box::new(Identifier::new(Token::new(), "".to_string())),
+            return_value: Box::new(Identifier::new(
+                Token::Empty("".to_string()),
+                "".to_string(),
+            )),
         }
     }
 }
 
 impl Statement for ReturnStatement {
     fn token_literal(&self) -> &str {
-        &self.token.literal
+        self.token.literal()
     }
     fn statement_node(&self) {}
     fn to_string(&self) -> String {
@@ -181,7 +190,7 @@ impl ExpressionStatement {
 
 impl Statement for ExpressionStatement {
     fn token_literal(&self) -> &str {
-        &self.token.literal
+        self.token.literal()
     }
 
     fn statement_node(&self) {
@@ -221,7 +230,7 @@ impl Expression for IntegerLiteral {
     }
 
     fn token_literal(&self) -> &str {
-        &self.token.literal
+        self.token.literal()
     }
 
     fn get_type(&self) -> AstType {
@@ -229,7 +238,7 @@ impl Expression for IntegerLiteral {
     }
 
     fn to_string(&self) -> String {
-        self.token.literal.to_string()
+        self.token.literal().to_string()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -259,7 +268,7 @@ impl Expression for PrefixExpression {
     }
 
     fn token_literal(&self) -> &str {
-        &self.token.literal
+        self.token.literal()
     }
 
     fn get_type(&self) -> AstType {
@@ -308,7 +317,7 @@ impl Expression for InfixExpression {
     }
 
     fn token_literal(&self) -> &str {
-        &self.token.literal
+        self.token.literal()
     }
 
     fn get_type(&self) -> AstType {
@@ -332,29 +341,20 @@ impl Expression for InfixExpression {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::token::token::TokenType::{Ident, Let};
     use std::assert_eq;
+    use std::str::FromStr;
 
     #[test]
     fn test_to_string() {
         let program = Program {
             statements: vec![Box::new(LetStatement {
-                token: Token {
-                    r#type: Let,
-                    literal: "let".to_string(),
-                },
+                token: Token::from_str("let").unwrap(),
                 name: Identifier {
-                    token: Token {
-                        r#type: Ident,
-                        literal: "myVar".to_string(),
-                    },
+                    token: Token::Ident("myVar".to_string()),
                     value: "myVar".to_string(),
                 },
                 value: Box::new(Identifier {
-                    token: Token {
-                        r#type: Ident,
-                        literal: "anotherVar".to_string(),
-                    },
+                    token: Token::Ident("anotherVar".to_string()),
                     value: "anotherVar".to_string(),
                 }),
             })],
