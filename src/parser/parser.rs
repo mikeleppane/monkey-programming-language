@@ -163,14 +163,6 @@ impl Parser {
 
     fn peek_token_matches(&self, token: &Token) -> bool {
         self.peek_token.matches(token)
-        // let token = Token::from_str(token_literal);
-        // match token {
-        //     Ok(found_token) => {
-        //         let _token = &self.peek_token;
-        //         matches!(found_token, _token)
-        //     }
-        //     Err(_) => false,
-        // }
     }
 
     fn expect_peek(&mut self, token: &Token) -> bool {
@@ -251,9 +243,9 @@ impl Parser {
             self.current_token.literal(),
             None,
         );
-        self.next_token();
         let precedence = Precedences::get_precedence(&self.current_token);
-        expression.right = self.parse_expression(precedence.clone());
+        self.next_token();
+        expression.right = self.parse_expression(precedence);
         Some(Box::new(expression))
     }
 
@@ -586,6 +578,43 @@ mod tests {
                 &infix_expression.right,
                 i64::from_str(map.get("right_value").unwrap()).unwrap(),
             );
+        }
+    }
+
+    #[test]
+    fn test_operator_precedence_parsing() {
+        let test_inputs = vec![
+            HashMap::from([("input", "-a * b"), ("expected", "((-a) * b)")]),
+            HashMap::from([("input", "!-a"), ("expected", "(!(-a))")]),
+            HashMap::from([("input", "a + b + c"), ("expected", "((a + b) + c)")]),
+            HashMap::from([("input", "a + b - c"), ("expected", "((a + b) - c)")]),
+            HashMap::from([("input", "a * b * c"), ("expected", "((a * b) * c)")]),
+            HashMap::from([("input", "a * b / c"), ("expected", "((a * b) / c)")]),
+            HashMap::from([("input", "a + b / c"), ("expected", "(a + (b / c))")]),
+            HashMap::from([
+                ("input", "a + b * c + d / e - f"),
+                ("expected", "(((a + (b * c)) + (d / e)) - f)"),
+            ]),
+            HashMap::from([
+                ("input", "3 + 4; -5 * 5"),
+                ("expected", "(3 + 4)((-5) * 5)"),
+            ]),
+            HashMap::from([
+                ("input", "5 > 4 == 3 < 4"),
+                ("expected", "((5 > 4) == (3 < 4))"),
+            ]),
+            HashMap::from([
+                ("input", "3 + 4 * 5 == 3 * 1 + 4 * 5"),
+                ("expected", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
+            ]),
+        ];
+        for map in test_inputs {
+            let lexer = Lexer::new(map.get("input").unwrap());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
+            assert_eq!(&program.to_string(), map.get("expected").unwrap())
+            //let statement = &program.statements[0];
         }
     }
 }

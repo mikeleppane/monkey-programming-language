@@ -51,9 +51,10 @@ impl fmt::Display for Program {
             "{}",
             self.statements
                 .iter()
-                .map(|s| s.to_string())
+                .map(|s| { s.to_string() })
                 .collect::<Vec<String>>()
                 .join("")
+                .trim()
         )
     }
 }
@@ -198,10 +199,13 @@ impl Statement for ExpressionStatement {
     }
     fn to_string(&self) -> String {
         let mut string = "".to_string();
-        //string.push_str(self.token_literal());
-        string.push_str(self.expression.as_ref().unwrap().to_string().as_str());
-        string.push(' ');
-        string
+        match self.expression.as_ref() {
+            None => string,
+            Some(expr) => {
+                string.push_str(expr.to_string().as_str());
+                string
+            }
+        }
     }
 
     fn get_type(&self) -> AstType {
@@ -276,11 +280,13 @@ impl Expression for PrefixExpression {
     }
 
     fn to_string(&self) -> String {
-        let mut string = "(".to_string();
-        string.push_str(self.operator.as_str());
-        string.push_str(self.right.as_ref().unwrap().to_string().as_str());
-        string.push(')');
-        string
+        format!(
+            "{}{}{}{}",
+            "(",
+            self.operator.as_str(),
+            self.right.as_ref().unwrap().to_string(),
+            ")"
+        )
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -325,12 +331,14 @@ impl Expression for InfixExpression {
     }
 
     fn to_string(&self) -> String {
-        let mut string = "(".to_string();
-        string.push_str(self.left.as_ref().to_string().as_str());
-        string.push_str(self.operator.as_str());
-        string.push_str(self.right.as_ref().unwrap().to_string().as_str());
-        string.push(')');
-        string
+        format!(
+            "{}{} {} {}{}",
+            "(",
+            self.left.as_ref().to_string(),
+            self.operator.as_str(),
+            self.right.as_ref().unwrap().to_string(),
+            ")"
+        )
     }
 
     fn as_any(&self) -> &dyn Any {

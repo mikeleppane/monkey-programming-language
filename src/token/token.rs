@@ -104,13 +104,7 @@ impl Token {
 
     pub(crate) fn matches(&self, token: &Token) -> bool {
         match self {
-            Token::Ident(_) => {
-                return match token {
-                    Token::Ident(_) => true,
-                    _ => false,
-                }
-            }
-
+            Token::Ident(_) => matches!(token, Token::Ident(_)),
             _ => token == self,
         }
     }
