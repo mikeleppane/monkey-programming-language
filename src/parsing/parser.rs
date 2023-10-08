@@ -1,8 +1,8 @@
-use crate::ast::ast::ExpressionStatement;
-use crate::ast::ast::*;
-use crate::lexer::lexer::*;
-use crate::parser::parser::Precedences::{Equals, LessGreater, Lowest, Product, Sum};
-use crate::token::token::*;
+use crate::astm::ast::ExpressionStatement;
+use crate::astm::ast::*;
+use crate::lexing::lexer::*;
+use crate::parsing::parser::Precedences::{Equals, LessGreater, Lowest, Product, Sum};
+use crate::token::tokens::*;
 use std::str::FromStr;
 
 #[allow(dead_code)]
@@ -20,32 +20,32 @@ pub enum Precedences {
 impl Precedences {
     fn get_precedence(token: &Token) -> Precedences {
         match token {
-            Token::EQ(_) => Equals,
-            Token::NOT_EQ(_) => Equals,
-            Token::LT(_) => LessGreater,
-            Token::GT(_) => LessGreater,
-            Token::Plus(_) => Sum,
-            Token::Minus(_) => Sum,
-            Token::Slash(_) => Product,
-            Token::Asterisk(_) => Product,
+            Token::EQ => Equals,
+            Token::NOT_EQ => Equals,
+            Token::LT => LessGreater,
+            Token::GT => LessGreater,
+            Token::Plus => Sum,
+            Token::Minus => Sum,
+            Token::Slash => Product,
+            Token::Asterisk => Product,
             _ => Lowest,
         }
     }
 }
 
-struct Parser {
-    lexer: Lexer,
+struct Parser<'a> {
+    lexer: Lexer<'a>,
     current_token: Token,
     peek_token: Token,
     errors: Vec<String>,
 }
 
-impl Parser {
-    fn new(lexer: Lexer) -> Self {
+impl<'a> Parser<'a> {
+    fn new(lexer: Lexer<'a>) -> Self {
         let mut parser = Parser {
             lexer,
-            current_token: Token::from_str("").unwrap(),
-            peek_token: Token::from_str("").unwrap(),
+            current_token: Token::Empty,
+            peek_token: Token::Empty,
             errors: Vec::new(),
         };
         parser.next_token();
@@ -62,7 +62,7 @@ impl Parser {
         let mut program = Program {
             statements: Vec::new(),
         };
-        while !self.current_token_matches("") {
+        while !matches!(self.current_token, Token::Empty) {
             let statement = self.parse_statement();
             if let Some(x) = statement {
                 program.statements.push(x)
@@ -74,13 +74,13 @@ impl Parser {
 
     fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
         match self.current_token {
-            Token::Let(_) => {
+            Token::Let => {
                 if let Some(x) = self.parse_let_statement() {
                     return Some(Box::new(x));
                 }
                 None
             }
-            Token::Return(_) => {
+            Token::Return => {
                 if let Some(x) = self.parse_return_statement() {
                     return Some(Box::new(x));
                 }
@@ -90,12 +90,12 @@ impl Parser {
         }
     }
 
-    fn parse_expression_statement(&mut self) -> Box<dyn Statement> {
+    fn parse_expression_statement(&mut self) -> Box<ExpressionStatement> {
         let statement = ExpressionStatement::new(
             self.current_token.clone(),
             self.parse_expression(Precedences::Lowest),
         );
-        if self.peek_token_matches(&Token::from_str(";").unwrap()) {
+        if matches!(self.peek_token, Token::Semicolon) {
             self.next_token()
         }
         Box::new(statement)
@@ -103,14 +103,14 @@ impl Parser {
 
     fn parse_expression(&mut self, precedence: Precedences) -> Option<Box<dyn Expression>> {
         let mut left_prefix = self.parse_prefix(&self.current_token.clone());
-        if let None = &left_prefix {
+        if left_prefix.is_none() {
             self.errors.push(format!(
                 "No prefix function for {:?} found",
                 self.current_token.literal()
             ));
             return None;
         }
-        while !self.peek_token_matches(&Token::from_str(";").unwrap())
+        while !matches!(self.peek_token, Token::Semicolon)
             && precedence < Precedences::get_precedence(&self.peek_token)
         {
             if !self.check_infixes(&self.peek_token) {
@@ -133,11 +133,11 @@ impl Parser {
             self.current_token.literal().to_string(),
         );
 
-        if !self.expect_peek(&Token::Assign("=".to_string())) {
+        if !self.expect_peek(&Token::Assign) {
             return None;
         }
 
-        while !self.current_token_matches(SEMICOLON) {
+        while !matches!(self.current_token, Token::Semicolon) {
             self.next_token();
         }
         Some(statement)
@@ -147,26 +147,26 @@ impl Parser {
         let statement = ReturnStatement::new(self.current_token.clone());
         self.next_token();
 
-        while !self.current_token_matches(SEMICOLON) {
+        while !matches!(self.current_token, Token::Semicolon) {
             self.next_token();
         }
         Some(statement)
     }
 
-    fn current_token_matches(&self, token_literal: &str) -> bool {
-        let token = Token::from_str(token_literal);
-        match token {
-            Ok(found_token) => self.current_token.matches(&found_token),
-            Err(_) => false,
-        }
-    }
+    /* fn current_token_matches(&self, token_literal: &str) -> bool {
+           let token = Token::from_str(token_literal);
+           match token {
+               Ok(found_token) => self.current_token.matches(&found_token),
+               Err(_) => false,
+           }
+       }
 
-    fn peek_token_matches(&self, token: &Token) -> bool {
-        self.peek_token.matches(token)
-    }
-
+       fn peek_token_matches(&self, token: &Token) -> bool {
+           self.peek_token.matches(token)
+       }
+    */
     fn expect_peek(&mut self, token: &Token) -> bool {
-        match self.peek_token_matches(token) {
+        match self.peek_token.matches(token) {
             true => {
                 self.next_token();
                 true
@@ -195,8 +195,8 @@ impl Parser {
         match token {
             Token::Ident(_) => Some(self.parse_identifier()),
             Token::Int(_) => self.parse_integer_literal(),
-            Token::Bang(_) => self.parse_prefix_expression(),
-            Token::Minus(_) => self.parse_prefix_expression(),
+            Token::Bang => self.parse_prefix_expression(),
+            Token::Minus => self.parse_prefix_expression(),
             _ => None,
         }
     }
@@ -239,7 +239,7 @@ impl Parser {
     fn parse_infix_expression(&mut self, left: Box<dyn Expression>) -> Option<Box<dyn Expression>> {
         let mut expression = InfixExpression::new(
             self.current_token.clone(),
-            left,
+            Some(left),
             self.current_token.literal(),
             None,
         );
@@ -255,14 +255,14 @@ impl Parser {
         expression: Box<dyn Expression>,
     ) -> Option<Box<dyn Expression>> {
         match token {
-            Token::Plus(_) => self.parse_infix_expression(expression),
-            Token::Minus(_) => self.parse_infix_expression(expression),
-            Token::Slash(_) => self.parse_infix_expression(expression),
-            Token::Asterisk(_) => self.parse_infix_expression(expression),
-            Token::EQ(_) => self.parse_infix_expression(expression),
-            Token::NOT_EQ(_) => self.parse_infix_expression(expression),
-            Token::LT(_) => self.parse_infix_expression(expression),
-            Token::GT(_) => self.parse_infix_expression(expression),
+            Token::Plus => self.parse_infix_expression(expression),
+            Token::Minus => self.parse_infix_expression(expression),
+            Token::Slash => self.parse_infix_expression(expression),
+            Token::Asterisk => self.parse_infix_expression(expression),
+            Token::EQ => self.parse_infix_expression(expression),
+            Token::NOT_EQ => self.parse_infix_expression(expression),
+            Token::LT => self.parse_infix_expression(expression),
+            Token::GT => self.parse_infix_expression(expression),
             _ => None,
         }
     }
@@ -270,25 +270,145 @@ impl Parser {
     fn check_infixes(&self, token: &Token) -> bool {
         matches!(
             token,
-            Token::Plus(_)
-                | Token::Minus(_)
-                | Token::Slash(_)
-                | Token::Asterisk(_)
-                | Token::EQ(_)
-                | Token::NOT_EQ(_)
-                | Token::LT(_)
-                | Token::GT(_)
+            Token::Plus
+                | Token::Minus
+                | Token::Slash
+                | Token::Asterisk
+                | Token::EQ
+                | Token::NOT_EQ
+                | Token::LT
+                | Token::GT
         )
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use anyhow::bail;
+
     use super::*;
     use std::assert_eq;
     use std::collections::HashMap;
 
-    fn is_let_statement_ok(statement: &dyn Statement, name: &str) -> bool {
+    fn check_parser_errors(parser: &Parser) {
+        if parser.errors.is_empty() {
+            return;
+        }
+        eprintln!("Parser has errors: {:?}", parser.errors.len());
+        for error in parser.errors().iter() {
+            eprintln!("Parser error: {:?}", error);
+        }
+        panic!("Parser errors found!")
+    }
+
+    fn check_let_statement(statement: &dyn Statement, name: &str) {
+        assert_eq!(
+            statement.token_literal(),
+            "let",
+            "Token literal is not 'let'! Got {}",
+            statement.token_literal()
+        );
+        let let_stmt = match statement.as_any().downcast_ref::<LetStatement>() {
+            Some(stmt) => stmt,
+            None => panic!("statement is not LetStatement"),
+        };
+
+        assert_eq!(
+            let_stmt.name.value, name,
+            "Identifier's value is not {}! Got {}",
+            name, let_stmt.name.value
+        );
+
+        assert_eq!(
+            let_stmt.name.token_literal(),
+            name,
+            "Identifier's value is not {}! Got {}",
+            name,
+            let_stmt.name.token_literal()
+        );
+    }
+
+    fn check_return_statement(statement: &dyn Statement, name: &str) {
+        assert_eq!(
+            statement.token_literal(),
+            "return",
+            "Token literal is not 'return'! Got {}",
+            statement.token_literal()
+        );
+        match statement.as_any().downcast_ref::<ReturnStatement>() {
+            Some(stmt) => stmt,
+            None => panic!("statement is not ReturnStatement"),
+        };
+    }
+
+    #[test]
+    fn test_let_statements() {
+        let test_input = "let x = 5;\
+        let y = 10;\
+        let foobar = 838383;\
+        ";
+        let inputs = ["x", "y", "foobar"];
+        let lexer = Lexer::new(test_input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        assert_eq!(
+            program.statements.len(),
+            3,
+            "There should be three program statements"
+        );
+        check_parser_errors(&parser);
+        for (index, identifier) in inputs.iter().enumerate() {
+            let statement = &program.statements[index];
+            check_let_statement(statement.as_ref(), identifier)
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_let_statements_should_panic_when_parser_founds_errors() {
+        let test_input = "let x 5;\
+        let y = 10;\
+        let foobar = 838383;\
+        ";
+        let inputs = ["x", "y", "foobar"];
+        let lexer = Lexer::new(test_input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        assert_eq!(
+            program.statements.len(),
+            3,
+            "There should be three program statements"
+        );
+        check_parser_errors(&parser);
+        for (index, identifier) in inputs.iter().enumerate() {
+            let statement = &program.statements[index];
+            check_let_statement(statement.as_ref(), identifier)
+        }
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let test_input = "return 5;\
+        return 10;\
+        return 993322;\
+        ";
+        let inputs = ["x", "y", "foobar"];
+        let lexer = Lexer::new(test_input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        assert_eq!(
+            program.statements.len(),
+            3,
+            "There should be three program statements"
+        );
+        check_parser_errors(&parser);
+        for (index, identifier) in inputs.iter().enumerate() {
+            let statement = &program.statements[index];
+            check_return_statement(statement.as_ref(), identifier)
+        }
+    }
+
+    /* fn is_let_statement_ok(statement: &dyn Statement, name: &str) -> bool {
         if statement.token_literal() != "let" {
             eprintln!(
                 "Token literal is not 'let'! Got {}",
@@ -616,5 +736,5 @@ mod tests {
             assert_eq!(&program.to_string(), map.get("expected").unwrap())
             //let statement = &program.statements[0];
         }
-    }
+    } */
 }

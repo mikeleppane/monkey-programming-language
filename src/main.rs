@@ -1,14 +1,14 @@
 extern crate core;
 
-mod ast;
-mod lexer;
-mod parser;
-mod repl;
+mod astm;
+mod cli;
+mod lexing;
+mod parsing;
 mod token;
 
 use std::env;
 
-use repl::repl::*;
+use cli::repl::*;
 
 fn main() {
     println!(

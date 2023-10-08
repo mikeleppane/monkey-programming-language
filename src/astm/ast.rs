@@ -1,32 +1,20 @@
-use crate::token::token::*;
-use std::any::Any;
-use std::fmt;
+use crate::token::tokens::*;
+use std::{any::Any, fmt};
 
-#[derive(PartialEq, Eq, Debug)]
-pub enum AstType {
-    Let,
-    Return,
-    ExprStatement,
-    Int,
-    Prefix,
-    Infix,
-    Identifier,
+pub trait Node {
+    fn token_literal(&self) -> &str;
+    fn get_name(&self) -> &'static str;
+    fn as_any(&self) -> &dyn Any;
 }
 
-pub trait Statement {
-    fn token_literal(&self) -> &str;
+pub trait Statement: Node {
     fn statement_node(&self);
     fn to_string(&self) -> String;
-    fn get_type(&self) -> AstType;
-    fn as_any(&self) -> &dyn Any;
 }
 
-pub trait Expression {
+pub trait Expression: Node {
     fn expression_node(&self);
-    fn token_literal(&self) -> &str;
-    fn get_type(&self) -> AstType;
     fn to_string(&self) -> String;
-    fn as_any(&self) -> &dyn Any;
 }
 
 pub struct Program {
@@ -72,65 +60,51 @@ impl Identifier {
     }
 }
 
-impl Expression for Identifier {
-    fn expression_node(&self) {}
-
+impl Node for Identifier {
     fn token_literal(&self) -> &str {
         self.token.literal()
     }
-    fn get_type(&self) -> AstType {
-        AstType::Identifier
-    }
 
-    fn to_string(&self) -> String {
-        self.value.clone()
+    fn get_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+impl Expression for Identifier {
+    fn expression_node(&self) {}
+
+    fn to_string(&self) -> String {
+        self.value.clone()
     }
 }
 
 pub struct LetStatement {
     token: Token,
     pub name: Identifier,
-    pub value: Box<dyn Expression>,
+    pub value: Option<Box<dyn Expression>>,
 }
 
 impl LetStatement {
     pub fn new(token: Token) -> Self {
         Self {
             token,
-            name: Identifier::new(
-                Token::Empty("".to_string()),
-                "".to_string(), /* std::string::String */
-            ),
-            value: Box::new(Identifier::new(
-                Token::Empty("".to_string()),
-                "".to_string(), /* std::string::String */
-            )),
+            name: Identifier::new(Token::Empty, "".to_string() /* std::string::String */),
+            value: None,
         }
     }
 }
 
-impl Statement for LetStatement {
+impl Node for LetStatement {
     fn token_literal(&self) -> &str {
         self.token.literal()
     }
-    fn statement_node(&self) {}
 
-    fn to_string(&self) -> String {
-        let mut string = "".to_string();
-        string.push_str(self.token_literal());
-        string.push(' ');
-        string.push_str(self.name.to_string().as_str());
-        string.push_str(" = ");
-        string.push_str(self.value.to_string().as_str());
-        string.push(';');
-        string
-    }
-    fn get_type(&self) -> AstType {
-        AstType::Let
+    fn get_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -138,42 +112,68 @@ impl Statement for LetStatement {
     }
 }
 
+impl Statement for LetStatement {
+    fn statement_node(&self) {}
+
+    fn to_string(&self) -> String {
+        let mut string = "".to_string();
+        let value = if let Some(x) = &self.value {
+            x.to_string()
+        } else {
+            "".to_string()
+        };
+        string.push_str(self.token_literal());
+        string.push(' ');
+        string.push_str(self.name.to_string().as_str());
+        string.push_str(" = ");
+        string.push_str(value.as_str());
+        string.push(';');
+        string
+    }
+}
+
 pub struct ReturnStatement {
     token: Token,
-    return_value: Box<dyn Expression>,
+    return_value: Option<Box<dyn Expression>>,
 }
 
 impl ReturnStatement {
     pub fn new(token: Token) -> Self {
         Self {
             token,
-            return_value: Box::new(Identifier::new(
-                Token::Empty("".to_string()),
-                "".to_string(),
-            )),
+            return_value: None,
         }
     }
 }
 
-impl Statement for ReturnStatement {
+impl Node for ReturnStatement {
     fn token_literal(&self) -> &str {
         self.token.literal()
     }
-    fn statement_node(&self) {}
-    fn to_string(&self) -> String {
-        let mut string = "".to_string();
-        string.push_str(self.token_literal());
-        string.push(' ');
-        string.push_str(self.return_value.to_string().as_str());
-        string.push(';');
-        string
-    }
-    fn get_type(&self) -> AstType {
-        AstType::Return
+
+    fn get_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+impl Statement for ReturnStatement {
+    fn statement_node(&self) {}
+    fn to_string(&self) -> String {
+        let mut string = "".to_string();
+        let ret_value = if let Some(x) = &self.return_value {
+            x.to_string()
+        } else {
+            "".to_string()
+        };
+        string.push_str(self.token_literal());
+        string.push(' ');
+        string.push_str(ret_value.as_ref());
+        string.push(';');
+        string
     }
 }
 
@@ -189,11 +189,21 @@ impl ExpressionStatement {
     }
 }
 
-impl Statement for ExpressionStatement {
+impl Node for ExpressionStatement {
     fn token_literal(&self) -> &str {
         self.token.literal()
     }
 
+    fn get_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl Statement for ExpressionStatement {
     fn statement_node(&self) {
         todo!()
     }
@@ -206,14 +216,6 @@ impl Statement for ExpressionStatement {
                 string
             }
         }
-    }
-
-    fn get_type(&self) -> AstType {
-        AstType::ExprStatement
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
@@ -228,25 +230,27 @@ impl IntegerLiteral {
     }
 }
 
+impl Node for IntegerLiteral {
+    fn token_literal(&self) -> &str {
+        self.token.literal()
+    }
+
+    fn get_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 impl Expression for IntegerLiteral {
     fn expression_node(&self) {
         todo!()
     }
 
-    fn token_literal(&self) -> &str {
-        self.token.literal()
-    }
-
-    fn get_type(&self) -> AstType {
-        AstType::Int
-    }
-
     fn to_string(&self) -> String {
         self.token.literal().to_string()
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
@@ -266,27 +270,13 @@ impl PrefixExpression {
     }
 }
 
-impl Expression for PrefixExpression {
-    fn expression_node(&self) {
-        todo!()
-    }
-
+impl Node for PrefixExpression {
     fn token_literal(&self) -> &str {
         self.token.literal()
     }
 
-    fn get_type(&self) -> AstType {
-        AstType::Prefix
-    }
-
-    fn to_string(&self) -> String {
-        format!(
-            "{}{}{}{}",
-            "(",
-            self.operator.as_str(),
-            self.right.as_ref().unwrap().to_string(),
-            ")"
-        )
+    fn get_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -294,9 +284,24 @@ impl Expression for PrefixExpression {
     }
 }
 
+impl Expression for PrefixExpression {
+    fn expression_node(&self) {
+        todo!()
+    }
+
+    fn to_string(&self) -> String {
+        let right = if let Some(x) = &self.right {
+            x.to_string()
+        } else {
+            "".to_owned()
+        };
+        format!("{}{}{}{}", "(", self.operator.as_str(), right, ")")
+    }
+}
+
 pub struct InfixExpression {
     token: Token,
-    pub left: Box<dyn Expression>,
+    pub left: Option<Box<dyn Expression>>,
     pub operator: String,
     pub right: Option<Box<dyn Expression>>,
 }
@@ -304,7 +309,7 @@ pub struct InfixExpression {
 impl InfixExpression {
     pub fn new(
         token: Token,
-        left: Box<dyn Expression>,
+        left: Option<Box<dyn Expression>>,
         operator: &str,
         right: Option<Box<dyn Expression>>,
     ) -> Self {
@@ -317,32 +322,44 @@ impl InfixExpression {
     }
 }
 
+impl Node for InfixExpression {
+    fn token_literal(&self) -> &str {
+        self.token.literal()
+    }
+
+    fn get_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 impl Expression for InfixExpression {
     fn expression_node(&self) {
         todo!()
     }
 
-    fn token_literal(&self) -> &str {
-        self.token.literal()
-    }
-
-    fn get_type(&self) -> AstType {
-        AstType::Infix
-    }
-
     fn to_string(&self) -> String {
+        let right = if let Some(x) = &self.right {
+            x.to_string()
+        } else {
+            "".to_owned()
+        };
+        let left = if let Some(x) = &self.left {
+            x.to_string()
+        } else {
+            "".to_owned()
+        };
         format!(
             "{}{} {} {}{}",
             "(",
-            self.left.as_ref().to_string(),
+            left,
             self.operator.as_str(),
-            self.right.as_ref().unwrap().to_string(),
+            right,
             ")"
         )
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 }
 
@@ -356,15 +373,15 @@ mod tests {
     fn test_to_string() {
         let program = Program {
             statements: vec![Box::new(LetStatement {
-                token: Token::from_str("let").unwrap(),
+                token: Token::Let,
                 name: Identifier {
                     token: Token::Ident("myVar".to_string()),
                     value: "myVar".to_string(),
                 },
-                value: Box::new(Identifier {
+                value: Some(Box::new(Identifier {
                     token: Token::Ident("anotherVar".to_string()),
                     value: "anotherVar".to_string(),
-                }),
+                })),
             })],
         };
         assert_eq!(program.to_string().as_str(), "let myVar = anotherVar;")

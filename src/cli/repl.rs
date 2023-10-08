@@ -1,5 +1,5 @@
-use crate::lexer::lexer::*;
-use crate::token::token::Token;
+use crate::lexing::lexer::*;
+use crate::token::tokens::Token;
 use std::io;
 use std::io::prelude::*;
 
@@ -11,14 +11,15 @@ pub fn start() {
     print!("{}", PROMPT);
     io::stdout().flush().unwrap();
     for line_result in stdin.lock().lines() {
-        let line = line_result.unwrap().trim().to_string();
-        if line == EXIT {
+        let line = line_result.unwrap();
+        let line_trimmed = line.trim();
+        if line_trimmed == EXIT {
             return;
         }
-        let mut lexer = Lexer::new(&line);
+        let mut lexer = Lexer::new(line_trimmed);
         loop {
             let tok = lexer.next_token();
-            if let Token::Empty(_) = tok {
+            if let Token::Empty = tok {
                 break;
             }
             println!("{:#?}", tok);
