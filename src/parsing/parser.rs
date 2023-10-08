@@ -1,7 +1,7 @@
-use crate::astm::ast::ExpressionStatement;
-use crate::astm::ast::*;
 use crate::lexing::lexer::*;
 use crate::parsing::parser::Precedences::{Equals, LessGreater, Lowest, Product, Sum};
+use crate::syntax_tree::ast::ExpressionStatement;
+use crate::syntax_tree::ast::*;
 use crate::token::tokens::*;
 use std::str::FromStr;
 
@@ -366,6 +366,31 @@ mod tests {
         );
     }
 
+    fn check_integer_literal(ident: &ExpressionStatement, value: i64) {
+        let integer = match ident
+            .expression
+            .as_ref()
+            .expect("Expecting expression")
+            .as_any()
+            .downcast_ref::<IntegerLiteral>()
+        {
+            Some(ident) => ident,
+            None => panic!("expression is not IntegerLiteral"),
+        };
+        assert_eq!(
+            integer.value, value,
+            "IntegerLiteral value is not {}! Got {}",
+            value, integer.value
+        );
+        assert_eq!(
+            integer.token_literal(),
+            value.to_string(),
+            "Ident token literal is not {}! Got {}",
+            value,
+            integer.token_literal()
+        );
+    }
+
     #[test]
     fn test_let_statements() {
         let test_input = "let x = 5;\
@@ -427,7 +452,7 @@ mod tests {
         for statement in &program.statements {
             match statement.as_any().downcast_ref::<ExpressionStatement>() {
                 Some(expr) => check_identifier_expression(expr, "foobar"),
-                None => panic!("statement is not Identifier"),
+                None => panic!("statement is not ExpressionStatement"),
             };
         }
     }
@@ -449,6 +474,27 @@ mod tests {
         check_parser_errors(&parser);
         for statement in &program.statements {
             check_return_statement(statement.as_ref());
+        }
+    }
+
+    #[test]
+    fn test_integer_literal_expressions() {
+        let test_input = "5;";
+        let lexer = Lexer::new(test_input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "Program has not enough statements. Got {}",
+            program.statements.len()
+        );
+        check_parser_errors(&parser);
+        for statement in &program.statements {
+            match statement.as_any().downcast_ref::<ExpressionStatement>() {
+                Some(expr) => check_integer_literal(expr, 5),
+                None => panic!("statement is not ExpressionStatement"),
+            };
         }
     }
 

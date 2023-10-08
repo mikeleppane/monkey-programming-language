@@ -1,9 +1,9 @@
 extern crate core;
 
-mod astm;
 mod cli;
 mod lexing;
 mod parsing;
+mod syntax_tree;
 mod token;
 
 use std::env;

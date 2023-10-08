@@ -366,7 +366,6 @@ impl Expression for InfixExpression {
 mod tests {
     use super::*;
     use std::assert_eq;
-    use std::str::FromStr;
 
     #[test]
     fn test_to_string() {
