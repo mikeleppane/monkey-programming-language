@@ -18,6 +18,7 @@ pub enum Precedences {
 }
 
 impl Precedences {
+    #[allow(dead_code)]
     fn get_precedence(token: &Token) -> Precedences {
         match token {
             Token::EQ => Equals,
@@ -33,6 +34,7 @@ impl Precedences {
     }
 }
 
+#[allow(dead_code)]
 struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Token,
@@ -41,6 +43,7 @@ struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
+    #[allow(dead_code)]
     fn new(lexer: Lexer<'a>) -> Self {
         let mut parser = Parser {
             lexer,
@@ -284,11 +287,8 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::bail;
-
     use super::*;
     use std::assert_eq;
-    use std::collections::HashMap;
 
     fn check_parser_errors(parser: &Parser) {
         if parser.errors.is_empty() {
@@ -328,7 +328,7 @@ mod tests {
         );
     }
 
-    fn check_return_statement(statement: &dyn Statement, name: &str) {
+    fn check_return_statement(statement: &dyn Statement) {
         assert_eq!(
             statement.token_literal(),
             "return",
@@ -339,6 +339,31 @@ mod tests {
             Some(stmt) => stmt,
             None => panic!("statement is not ReturnStatement"),
         };
+    }
+
+    fn check_identifier_expression(ident: &ExpressionStatement, value: &str) {
+        let ident = match ident
+            .expression
+            .as_ref()
+            .expect("Expecting expression")
+            .as_any()
+            .downcast_ref::<Identifier>()
+        {
+            Some(ident) => ident,
+            None => panic!("expression is not Identifier"),
+        };
+        assert_eq!(
+            ident.value, value,
+            "Ident value is not {}! Got {}",
+            value, ident.value
+        );
+        assert_eq!(
+            ident.token_literal(),
+            value,
+            "Ident token literal is not {}! Got {}",
+            value,
+            ident.value
+        );
     }
 
     #[test]
@@ -387,12 +412,32 @@ mod tests {
     }
 
     #[test]
+    fn test_identifier_expression() {
+        let test_input = "foobar;";
+        let lexer = Lexer::new(test_input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "Program has not enough statements. Got {}",
+            program.statements.len()
+        );
+        check_parser_errors(&parser);
+        for statement in &program.statements {
+            match statement.as_any().downcast_ref::<ExpressionStatement>() {
+                Some(expr) => check_identifier_expression(expr, "foobar"),
+                None => panic!("statement is not Identifier"),
+            };
+        }
+    }
+
+    #[test]
     fn test_return_statements() {
         let test_input = "return 5;\
         return 10;\
         return 993322;\
         ";
-        let inputs = ["x", "y", "foobar"];
         let lexer = Lexer::new(test_input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
@@ -402,9 +447,8 @@ mod tests {
             "There should be three program statements"
         );
         check_parser_errors(&parser);
-        for (index, identifier) in inputs.iter().enumerate() {
-            let statement = &program.statements[index];
-            check_return_statement(statement.as_ref(), identifier)
+        for statement in &program.statements {
+            check_return_statement(statement.as_ref());
         }
     }
 

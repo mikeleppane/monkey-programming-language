@@ -89,6 +89,7 @@ pub struct LetStatement {
 }
 
 impl LetStatement {
+    #[allow(dead_code)]
     pub fn new(token: Token) -> Self {
         Self {
             token,
@@ -117,16 +118,13 @@ impl Statement for LetStatement {
 
     fn to_string(&self) -> String {
         let mut string = "".to_string();
-        let value = if let Some(x) = &self.value {
-            x.to_string()
-        } else {
-            "".to_string()
-        };
         string.push_str(self.token_literal());
         string.push(' ');
         string.push_str(self.name.to_string().as_str());
         string.push_str(" = ");
-        string.push_str(value.as_str());
+        if let Some(x) = &self.value {
+            string.push_str(x.to_string().as_str());
+        };
         string.push(';');
         string
     }
@@ -138,6 +136,7 @@ pub struct ReturnStatement {
 }
 
 impl ReturnStatement {
+    #[allow(dead_code)]
     pub fn new(token: Token) -> Self {
         Self {
             token,
@@ -164,14 +163,11 @@ impl Statement for ReturnStatement {
     fn statement_node(&self) {}
     fn to_string(&self) -> String {
         let mut string = "".to_string();
-        let ret_value = if let Some(x) = &self.return_value {
-            x.to_string()
-        } else {
-            "".to_string()
-        };
         string.push_str(self.token_literal());
         string.push(' ');
-        string.push_str(ret_value.as_ref());
+        if let Some(x) = &self.return_value {
+            string.push_str(x.to_string().as_ref());
+        };
         string.push(';');
         string
     }
@@ -225,6 +221,7 @@ pub struct IntegerLiteral {
 }
 
 impl IntegerLiteral {
+    #[allow(dead_code)]
     pub fn new(token: Token, value: i64) -> Self {
         Self { token, value }
     }
@@ -261,6 +258,7 @@ pub struct PrefixExpression {
 }
 
 impl PrefixExpression {
+    #[allow(dead_code)]
     pub fn new(token: Token, operator: &str, right: Option<Box<dyn Expression>>) -> Self {
         Self {
             token,
@@ -307,6 +305,7 @@ pub struct InfixExpression {
 }
 
 impl InfixExpression {
+    #[allow(dead_code)]
     pub fn new(
         token: Token,
         left: Option<Box<dyn Expression>>,
