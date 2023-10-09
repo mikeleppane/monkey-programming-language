@@ -205,8 +205,18 @@ impl<'a> Parser<'a> {
             Token::Minus => self.parse_prefix_expression(),
             Token::True => self.parse_boolean(),
             Token::False => self.parse_boolean(),
+            Token::Lparen => self.parse_grouped_expression(),
             _ => None,
         }
+    }
+
+    fn parse_grouped_expression(&mut self) -> Option<Box<dyn Expression>> {
+        self.next_token();
+        let expr = self.parse_expression(Precedences::Lowest);
+        if !self.expect_peek(&Token::Rparen) {
+            return None;
+        }
+        expr
     }
 
     fn parse_boolean(&self) -> Option<Box<dyn Expression>> {
@@ -827,6 +837,17 @@ mod tests {
             Test::new(
                 String::from("3 < 5 == true"),
                 String::from("((3 < 5) == true)"),
+            ),
+            Test::new(
+                String::from("1 + (2 + 3) + 4"),
+                String::from("((1 + (2 + 3)) + 4)"),
+            ),
+            Test::new(String::from("(5 + 5) * 2"), String::from("((5 + 5) * 2)")),
+            Test::new(String::from("2 / (5 + 5)"), String::from("(2 / (5 + 5))")),
+            Test::new(String::from("-(5 + 5)"), String::from("(-(5 + 5))")),
+            Test::new(
+                String::from("!(true == true)"),
+                String::from("(!(true == true))"),
             ),
         ];
         for test in test_inputs {
