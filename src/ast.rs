@@ -362,6 +362,42 @@ impl Expression for InfixExpression {
     }
 }
 
+pub struct Boolean {
+    token: Token,
+    pub value: bool,
+}
+
+impl Boolean {
+    #[allow(dead_code)]
+    pub fn new(token: Token, value: bool) -> Self {
+        Self { token, value }
+    }
+}
+
+impl Node for Boolean {
+    fn token_literal(&self) -> &str {
+        self.token.literal()
+    }
+
+    fn get_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl Expression for Boolean {
+    fn expression_node(&self) {
+        todo!()
+    }
+
+    fn to_string(&self) -> String {
+        self.token_literal().to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

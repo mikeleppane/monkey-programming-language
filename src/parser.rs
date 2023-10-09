@@ -119,7 +119,11 @@ impl<'a> Parser<'a> {
                 return left_prefix;
             }
             self.next_token();
-            left_prefix = self.parse_infix(&self.current_token.clone(), left_prefix.unwrap());
+            left_prefix = self.parse_infix(
+                &self.current_token.clone(),
+                left_prefix
+                    .unwrap_or_else(|| panic!("parse_expression error: prefix cannot be None!")),
+            );
         }
         left_prefix
     }
@@ -199,8 +203,17 @@ impl<'a> Parser<'a> {
             Token::Int(_) => self.parse_integer_literal(),
             Token::Bang => self.parse_prefix_expression(),
             Token::Minus => self.parse_prefix_expression(),
+            Token::True => self.parse_boolean(),
+            Token::False => self.parse_boolean(),
             _ => None,
         }
+    }
+
+    fn parse_boolean(&self) -> Option<Box<dyn Expression>> {
+        Some(Box::new(Boolean::new(
+            self.current_token.clone(),
+            matches!(self.current_token, Token::True),
+        )))
     }
 
     fn parse_identifier(&self) -> Box<dyn Expression> {
@@ -257,14 +270,14 @@ impl<'a> Parser<'a> {
         expression: Box<dyn Expression>,
     ) -> Option<Box<dyn Expression>> {
         match token {
-            Token::Plus => self.parse_infix_expression(expression),
-            Token::Minus => self.parse_infix_expression(expression),
-            Token::Slash => self.parse_infix_expression(expression),
-            Token::Asterisk => self.parse_infix_expression(expression),
-            Token::EQ => self.parse_infix_expression(expression),
-            Token::NOT_EQ => self.parse_infix_expression(expression),
-            Token::LT => self.parse_infix_expression(expression),
-            Token::GT => self.parse_infix_expression(expression),
+            Token::Plus
+            | Token::Minus
+            | Token::Slash
+            | Token::Asterisk
+            | Token::EQ
+            | Token::NOT_EQ
+            | Token::LT
+            | Token::GT => self.parse_infix_expression(expression),
             _ => None,
         }
     }
@@ -362,6 +375,30 @@ mod tests {
             "Ident token literal is not {}! Got {}",
             value,
             ident.value
+        );
+    }
+
+    fn check_boolean_literal(expr: &Option<Box<dyn Expression>>, value: bool) {
+        let boolean = match expr
+            .as_ref()
+            .expect("Expecting expression")
+            .as_any()
+            .downcast_ref::<Boolean>()
+        {
+            Some(boolean) => boolean,
+            None => panic!("expression is not Boolean"),
+        };
+        assert_eq!(
+            boolean.value, value,
+            "Boolean value is not {}! Got {}",
+            value, boolean.value
+        );
+        assert_eq!(
+            boolean.token_literal(),
+            value.to_string(),
+            "Boolean token literal is not {}! Got {}",
+            value,
+            boolean.value
         );
     }
 
@@ -553,6 +590,60 @@ mod tests {
     }
 
     #[test]
+    fn test_parsing_prefix_expressions_with_boolean() {
+        struct PrefixTest {
+            input: String,
+            operator: String,
+            boolean: bool,
+        }
+        impl PrefixTest {
+            fn new(input: String, operator: String, boolean: bool) -> Self {
+                Self {
+                    input,
+                    operator,
+                    boolean,
+                }
+            }
+        }
+
+        let test_inputs = vec![
+            PrefixTest::new(String::from("!true;"), String::from("!"), true),
+            PrefixTest::new(String::from("!false;"), String::from("!"), false),
+        ];
+        for test in &test_inputs {
+            let lexer = Lexer::new(&test.input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
+            assert_eq!(
+                program.statements.len(),
+                1,
+                "There should be exactly one program statements"
+            );
+            for statement in &program.statements {
+                match statement.as_any().downcast_ref::<ExpressionStatement>() {
+                    Some(expr) => {
+                        match expr
+                            .expression
+                            .as_ref()
+                            .expect("Expecting expression")
+                            .as_any()
+                            .downcast_ref::<PrefixExpression>()
+                        {
+                            Some(expr) => {
+                                assert_eq!(expr.operator, test.operator);
+                                check_boolean_literal(&expr.right, test.boolean);
+                            }
+                            None => panic!("expression is not PrefixExpression"),
+                        };
+                    }
+                    None => panic!("statement is not ExpressionStatement"),
+                };
+            }
+        }
+    }
+
+    #[test]
     fn test_parsing_infix_expressions() {
         struct InfixTest {
             input: String,
@@ -615,333 +706,135 @@ mod tests {
         }
     }
 
-    /* fn is_let_statement_ok(statement: &dyn Statement, name: &str) -> bool {
-        if statement.token_literal() != "let" {
-            eprintln!(
-                "Token literal is not 'let'! Got {}",
-                statement.token_literal()
-            );
-            return false;
-        }
-        let let_statement = statement
-            .as_any()
-            .downcast_ref::<LetStatement>()
-            .expect("Expecting LetStament");
-        if let_statement.name.value != name {
-            eprintln!(
-                "Identifier's value is not {}! Got {}",
-                name, let_statement.name.value
-            );
-            return false;
-        }
-        if let_statement.name.token_literal() != name {
-            eprintln!(
-                "Identifier's value is not {}! Got {}",
-                name,
-                let_statement.name.token_literal()
-            );
-            return false;
-        }
-        true
-    }
-
-    fn check_parser_errors(parser: &Parser) {
-        if parser.errors.is_empty() {
-            return;
-        }
-        eprintln!("Parser has errors: {:?}", parser.errors.len());
-        for error in parser.errors().iter() {
-            eprintln!("Parser error: {:?}", error);
-        }
-    }
-
-    fn check_integer_literal(expression: &Option<Box<dyn Expression>>, value: i64) {
-        let integer_literal = expression
-            .as_ref()
-            .unwrap()
-            .as_any()
-            .downcast_ref::<IntegerLiteral>()
-            .expect("Was not IntegerLiteral");
-        assert_eq!(integer_literal.value, value);
-        assert_eq!(integer_literal.token_literal(), i64::to_string(&value))
-    }
-
     #[test]
-    fn test_let_statements() {
-        let test_input = "let x = 5;\
-        let y = 10;\
-        let foobar = 838383;\
-        ";
-        let inputs = vec!["x", "y", "foobar"];
-        let lexer = Lexer::new(test_input);
-        let mut parser = Parser::new(lexer);
-        let mut program = parser.parse_program();
-        program.statements = program
-            .statements
-            .into_iter()
-            .filter(|s| s.get_type() == AstType::Let)
-            .collect::<Vec<Box<dyn Statement>>>();
-        assert_eq!(
-            program.statements.len(),
-            3,
-            "There should three program statements"
-        );
-        check_parser_errors(&parser);
-        assert_eq!(parser.errors().len(), 0);
-        for (index, identifier) in inputs.iter().enumerate() {
-            let statement = &program.statements[index];
-            if statement.get_type() == AstType::Let {
-                assert!(is_let_statement_ok(statement.as_ref(), identifier))
+    fn test_parsing_infix_expressions_with_boolean() {
+        struct InfixTest {
+            input: String,
+            left_value: bool,
+            operator: String,
+            right_value: bool,
+        }
+        impl InfixTest {
+            fn new(input: String, left_value: bool, operator: String, right_value: bool) -> Self {
+                Self {
+                    input,
+                    left_value,
+                    operator,
+                    right_value,
+                }
+            }
+        }
+
+        let test_inputs = vec![
+            InfixTest::new(
+                String::from("true == true;"),
+                true,
+                String::from("=="),
+                true,
+            ),
+            InfixTest::new(
+                String::from("true != false;"),
+                true,
+                String::from("!="),
+                false,
+            ),
+            InfixTest::new(
+                String::from("false == false;"),
+                false,
+                String::from("=="),
+                false,
+            ),
+        ];
+        for test in &test_inputs {
+            let lexer = Lexer::new(&test.input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
+            assert_eq!(
+                program.statements.len(),
+                1,
+                "There should be exactly one program statements"
+            );
+            for statement in &program.statements {
+                match statement.as_any().downcast_ref::<ExpressionStatement>() {
+                    Some(expr) => {
+                        match expr
+                            .expression
+                            .as_ref()
+                            .expect("Expecting expression")
+                            .as_any()
+                            .downcast_ref::<InfixExpression>()
+                        {
+                            Some(expr) => {
+                                assert_eq!(expr.operator, test.operator);
+                                check_boolean_literal(&expr.left, test.left_value);
+                                check_boolean_literal(&expr.right, test.right_value);
+                            }
+                            None => panic!("expression is not InfixExpression"),
+                        };
+                    }
+                    None => panic!("statement is not ExpressionStatement"),
+                };
             }
         }
     }
 
     #[test]
-    fn test_check_errors() {
-        let test_input = "let x 5;\
-        let = 10;\
-        let 838383;\
-        ";
-        let lexer = Lexer::new(test_input);
-        let mut parser = Parser::new(lexer);
-        parser.parse_program();
-        check_parser_errors(&parser);
-        assert_eq!(parser.errors().len(), 4);
-    }
-
-    #[test]
-    fn test_return_statements() {
-        let test_input = "return 5;\
-        return 10;\
-        return 993322;\
-        ";
-        let lexer = Lexer::new(test_input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
-        check_parser_errors(&parser);
-        assert_eq!(parser.errors().len(), 0);
-        assert_eq!(
-            program.statements.len(),
-            3,
-            "There should be exactly three program statements"
-        );
-        for statement in program.statements {
-            assert_eq!(statement.token_literal(), "return")
-        }
-    }
-
-    #[test]
-    fn test_identifier_expression() {
-        let test_input = "foobar;";
-        let lexer = Lexer::new(test_input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
-        check_parser_errors(&parser);
-        assert_eq!(parser.errors().len(), 0);
-        assert_eq!(
-            program.statements.len(),
-            1,
-            "There should be exactly one program statements"
-        );
-        let statement = &program.statements[0];
-        assert_eq!(statement.get_type(), AstType::ExprStatement);
-        assert_eq!(statement.token_literal(), "foobar");
-    }
-
-    #[test]
-    fn test_integer_literal_expression() {
-        let test_input = "5;";
-        let lexer = Lexer::new(test_input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
-        check_parser_errors(&parser);
-        assert_eq!(parser.errors().len(), 0);
-        assert_eq!(
-            program.statements.len(),
-            1,
-            "There should be exactly one program statements"
-        );
-        let statement = &program.statements[0];
-        assert_eq!(statement.get_type(), AstType::ExprStatement);
-        assert_eq!(statement.token_literal(), "5");
-        let integer_literal = statement
-            .as_any()
-            .downcast_ref::<ExpressionStatement>()
-            .expect("Was not ExpressionStatemetn")
-            .expression
-            .as_ref()
-            .unwrap()
-            .as_any()
-            .downcast_ref::<IntegerLiteral>()
-            .expect("Was not ExpressionStatement");
-        assert_eq!(integer_literal.value, 5)
-    }
-
-    #[test]
-    fn test_parsing_prefix_expressions() {
-        let test_inputs = vec![
-            HashMap::from([("input", "!5"), ("operator", "!"), ("int_value", "5")]),
-            HashMap::from([("input", "-15"), ("operator", "-"), ("int_value", "15")]),
-        ];
-        for map in test_inputs {
-            let lexer = Lexer::new(map.get("input").unwrap());
-            let mut parser = Parser::new(lexer);
-            let program = parser.parse_program();
-            check_parser_errors(&parser);
-            assert_eq!(parser.errors().len(), 0);
-            assert_eq!(
-                program.statements.len(),
-                1,
-                "There should be exactly one program statements"
-            );
-            let statement = &program.statements[0];
-            assert_eq!(statement.get_type(), AstType::ExprStatement);
-            let prefix_expression = statement
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .expect("Was not ExpressionStatemetn")
-                .expression
-                .as_ref()
-                .unwrap()
-                .as_any()
-                .downcast_ref::<PrefixExpression>()
-                .expect("Was not PrefixExpression");
-            assert_eq!(prefix_expression.operator, *map.get("operator").unwrap());
-            check_integer_literal(
-                &prefix_expression.right,
-                i64::from_str(map.get("int_value").unwrap()).unwrap(),
-            )
-        }
-    }
-
-    #[test]
-    fn test_parsing_infix_expressions() {
-        let test_inputs = vec![
-            HashMap::from([
-                ("input", "5+5;"),
-                ("left_value", "5"),
-                ("operator", "+"),
-                ("right_value", "5"),
-            ]),
-            HashMap::from([
-                ("input", "5 - 5;"),
-                ("left_value", "5"),
-                ("operator", "-"),
-                ("right_value", "5"),
-            ]),
-            HashMap::from([
-                ("input", "5 * 5;"),
-                ("left_value", "5"),
-                ("operator", "*"),
-                ("right_value", "5"),
-            ]),
-            HashMap::from([
-                ("input", "5 / 5;"),
-                ("left_value", "5"),
-                ("operator", "/"),
-                ("right_value", "5"),
-            ]),
-            HashMap::from([
-                ("input", "5 > 5;"),
-                ("left_value", "5"),
-                ("operator", ">"),
-                ("right_value", "5"),
-            ]),
-            HashMap::from([
-                ("input", "5 < 5;"),
-                ("left_value", "5"),
-                ("operator", "<"),
-                ("right_value", "5"),
-            ]),
-            HashMap::from([
-                ("input", "5 == 5;"),
-                ("left_value", "5"),
-                ("operator", "=="),
-                ("right_value", "5"),
-            ]),
-            HashMap::from([
-                ("input", "5 != 5;"),
-                ("left_value", "5"),
-                ("operator", "!="),
-                ("right_value", "5"),
-            ]),
-        ];
-        for map in test_inputs {
-            let lexer = Lexer::new(map.get("input").unwrap());
-            let mut parser = Parser::new(lexer);
-            let program = parser.parse_program();
-            check_parser_errors(&parser);
-            assert_eq!(parser.errors().len(), 0);
-            assert_eq!(
-                program.statements.len(),
-                1,
-                "There should be exactly one program statements"
-            );
-            let statement = &program.statements[0];
-            assert_eq!(statement.get_type(), AstType::ExprStatement);
-            let infix_expression = statement
-                .as_any()
-                .downcast_ref::<ExpressionStatement>()
-                .expect("Was not ExpressionStatement")
-                .expression
-                .as_ref()
-                .unwrap()
-                .as_any()
-                .downcast_ref::<InfixExpression>()
-                .expect("Was not InfixExpression");
-            dbg!(infix_expression.to_string());
-            assert_eq!(infix_expression.operator, *map.get("operator").unwrap());
-            let il = infix_expression
-                .left
-                .as_ref()
-                .as_any()
-                .downcast_ref::<IntegerLiteral>()
-                .expect("Was not IntegerLiteral");
-            assert_eq!(
-                il.value,
-                i64::from_str(map.get("right_value").unwrap()).unwrap()
-            );
-            check_integer_literal(
-                &infix_expression.right,
-                i64::from_str(map.get("right_value").unwrap()).unwrap(),
-            );
-        }
-    }
-
-    #[test]
     fn test_operator_precedence_parsing() {
+        struct Test {
+            input: String,
+            expected: String,
+        }
+        impl Test {
+            fn new(input: String, expected: String) -> Self {
+                Self { input, expected }
+            }
+        }
         let test_inputs = vec![
-            HashMap::from([("input", "-a * b"), ("expected", "((-a) * b)")]),
-            HashMap::from([("input", "!-a"), ("expected", "(!(-a))")]),
-            HashMap::from([("input", "a + b + c"), ("expected", "((a + b) + c)")]),
-            HashMap::from([("input", "a + b - c"), ("expected", "((a + b) - c)")]),
-            HashMap::from([("input", "a * b * c"), ("expected", "((a * b) * c)")]),
-            HashMap::from([("input", "a * b / c"), ("expected", "((a * b) / c)")]),
-            HashMap::from([("input", "a + b / c"), ("expected", "(a + (b / c))")]),
-            HashMap::from([
-                ("input", "a + b * c + d / e - f"),
-                ("expected", "(((a + (b * c)) + (d / e)) - f)"),
-            ]),
-            HashMap::from([
-                ("input", "3 + 4; -5 * 5"),
-                ("expected", "(3 + 4)((-5) * 5)"),
-            ]),
-            HashMap::from([
-                ("input", "5 > 4 == 3 < 4"),
-                ("expected", "((5 > 4) == (3 < 4))"),
-            ]),
-            HashMap::from([
-                ("input", "3 + 4 * 5 == 3 * 1 + 4 * 5"),
-                ("expected", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
-            ]),
+            Test::new(String::from("-a * b"), String::from("((-a) * b)")),
+            Test::new(String::from("!-a"), String::from("(!(-a))")),
+            Test::new(String::from("a + b + c"), String::from("((a + b) + c)")),
+            Test::new(String::from("a + b - c"), String::from("((a + b) - c)")),
+            Test::new(String::from("a * b * c"), String::from("((a * b) * c)")),
+            Test::new(String::from("a * b / c"), String::from("((a * b) / c)")),
+            Test::new(String::from("a + b / c"), String::from("(a + (b / c))")),
+            Test::new(
+                String::from("a + b * c + d / e - f"),
+                String::from("(((a + (b * c)) + (d / e)) - f)"),
+            ),
+            Test::new(
+                String::from("3 + 4; -5 * 5"),
+                String::from("(3 + 4)((-5) * 5)"),
+            ),
+            Test::new(
+                String::from("5 > 4 == 3 < 4"),
+                String::from("((5 > 4) == (3 < 4))"),
+            ),
+            Test::new(
+                String::from("5 < 4 != 3 > 4"),
+                String::from("((5 < 4) != (3 > 4))"),
+            ),
+            Test::new(
+                String::from("3 + 4 * 5 == 3 * 1 + 4 * 5"),
+                String::from("((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
+            ),
+            Test::new(String::from("true"), String::from("true")),
+            Test::new(String::from("false"), String::from("false")),
+            Test::new(
+                String::from("3 > 5 == false"),
+                String::from("((3 > 5) == false)"),
+            ),
+            Test::new(
+                String::from("3 < 5 == true"),
+                String::from("((3 < 5) == true)"),
+            ),
         ];
-        for map in test_inputs {
-            let lexer = Lexer::new(map.get("input").unwrap());
+        for test in test_inputs {
+            let lexer = Lexer::new(&test.input);
             let mut parser = Parser::new(lexer);
             let program = parser.parse_program();
             check_parser_errors(&parser);
-            assert_eq!(&program.to_string(), map.get("expected").unwrap())
-            //let statement = &program.statements[0];
+            assert_eq!(program.to_string(), test.expected)
         }
-    } */
+    }
 }
