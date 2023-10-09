@@ -1,8 +1,7 @@
-use crate::lexing::lexer::*;
-use crate::parsing::parser::Precedences::{Equals, LessGreater, Lowest, Product, Sum};
-use crate::syntax_tree::ast::ExpressionStatement;
-use crate::syntax_tree::ast::*;
-use crate::token::tokens::*;
+use crate::ast::*;
+use crate::lexer::Lexer;
+use crate::parser::Precedences::{Equals, LessGreater, Lowest, Product, Sum};
+use crate::tokens::*;
 use std::str::FromStr;
 
 #[allow(dead_code)]
@@ -366,15 +365,14 @@ mod tests {
         );
     }
 
-    fn check_integer_literal(ident: &ExpressionStatement, value: i64) {
-        let integer = match ident
-            .expression
+    fn check_integer_literal(expr: &Option<Box<dyn Expression>>, value: i64) {
+        let integer = match expr
             .as_ref()
             .expect("Expecting expression")
             .as_any()
             .downcast_ref::<IntegerLiteral>()
         {
-            Some(ident) => ident,
+            Some(integer) => integer,
             None => panic!("expression is not IntegerLiteral"),
         };
         assert_eq!(
@@ -492,9 +490,65 @@ mod tests {
         check_parser_errors(&parser);
         for statement in &program.statements {
             match statement.as_any().downcast_ref::<ExpressionStatement>() {
-                Some(expr) => check_integer_literal(expr, 5),
+                Some(expr) => {
+                    check_integer_literal(&expr.expression, 5);
+                }
                 None => panic!("statement is not ExpressionStatement"),
             };
+        }
+    }
+
+    #[test]
+    fn test_parsing_prefix_expressions() {
+        struct PrefixTest {
+            input: String,
+            operator: String,
+            integer_value: i64,
+        }
+        impl PrefixTest {
+            fn new(input: String, operator: String, integer_value: i64) -> Self {
+                Self {
+                    input,
+                    operator,
+                    integer_value,
+                }
+            }
+        }
+
+        let test_inputs = vec![
+            PrefixTest::new(String::from("!5;"), String::from("!"), 5),
+            PrefixTest::new(String::from("-15;"), String::from("-"), 15),
+        ];
+        for test in &test_inputs {
+            let lexer = Lexer::new(&test.input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
+            assert_eq!(
+                program.statements.len(),
+                1,
+                "There should be exactly one program statements"
+            );
+            for statement in &program.statements {
+                match statement.as_any().downcast_ref::<ExpressionStatement>() {
+                    Some(expr) => {
+                        match expr
+                            .expression
+                            .as_ref()
+                            .expect("Expecting expression")
+                            .as_any()
+                            .downcast_ref::<PrefixExpression>()
+                        {
+                            Some(expr) => {
+                                assert_eq!(expr.operator, test.operator);
+                                check_integer_literal(&expr.right, test.integer_value);
+                            }
+                            None => panic!("expression is not PrefixExpression"),
+                        };
+                    }
+                    None => panic!("statement is not ExpressionStatement"),
+                };
+            }
         }
     }
 

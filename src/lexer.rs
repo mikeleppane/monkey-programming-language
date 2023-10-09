@@ -1,4 +1,4 @@
-use crate::token::tokens::*;
+use crate::tokens::*;
 
 pub struct Lexer<'a> {
     input: &'a str,
