@@ -552,6 +552,69 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_parsing_infix_expressions() {
+        struct InfixTest {
+            input: String,
+            left_value: i64,
+            operator: String,
+            right_value: i64,
+        }
+        impl InfixTest {
+            fn new(input: String, left_value: i64, operator: String, right_value: i64) -> Self {
+                Self {
+                    input,
+                    left_value,
+                    operator,
+                    right_value,
+                }
+            }
+        }
+
+        let test_inputs = vec![
+            InfixTest::new(String::from("5 + 5;"), 5, String::from("+"), 5),
+            InfixTest::new(String::from("5 - 5;"), 5, String::from("-"), 5),
+            InfixTest::new(String::from("5 * 5;"), 5, String::from("*"), 5),
+            InfixTest::new(String::from("5 / 5;"), 5, String::from("/"), 5),
+            InfixTest::new(String::from("5 > 5;"), 5, String::from(">"), 5),
+            InfixTest::new(String::from("5 < 5;"), 5, String::from("<"), 5),
+            InfixTest::new(String::from("5 == 5;"), 5, String::from("=="), 5),
+            InfixTest::new(String::from("5 != 5;"), 5, String::from("!="), 5),
+        ];
+        for test in &test_inputs {
+            let lexer = Lexer::new(&test.input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
+            assert_eq!(
+                program.statements.len(),
+                1,
+                "There should be exactly one program statements"
+            );
+            for statement in &program.statements {
+                match statement.as_any().downcast_ref::<ExpressionStatement>() {
+                    Some(expr) => {
+                        match expr
+                            .expression
+                            .as_ref()
+                            .expect("Expecting expression")
+                            .as_any()
+                            .downcast_ref::<InfixExpression>()
+                        {
+                            Some(expr) => {
+                                assert_eq!(expr.operator, test.operator);
+                                check_integer_literal(&expr.left, test.left_value);
+                                check_integer_literal(&expr.right, test.right_value);
+                            }
+                            None => panic!("expression is not InfixExpression"),
+                        };
+                    }
+                    None => panic!("statement is not ExpressionStatement"),
+                };
+            }
+        }
+    }
+
     /* fn is_let_statement_ok(statement: &dyn Statement, name: &str) -> bool {
         if statement.token_literal() != "let" {
             eprintln!(
