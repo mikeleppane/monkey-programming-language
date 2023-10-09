@@ -398,6 +398,107 @@ impl Expression for Boolean {
     }
 }
 
+pub struct IfExpression {
+    token: Token,
+    pub condition: Option<Box<dyn Expression>>,
+    pub consequence: Option<BlockStatement>,
+    pub alternative: Option<BlockStatement>,
+}
+
+impl IfExpression {
+    #[allow(dead_code)]
+    pub fn new(
+        token: Token,
+        condition: Option<Box<dyn Expression>>,
+        consequence: Option<BlockStatement>,
+        alternative: Option<BlockStatement>,
+    ) -> Self {
+        Self {
+            token,
+            condition,
+            consequence,
+            alternative,
+        }
+    }
+}
+
+impl Node for IfExpression {
+    fn token_literal(&self) -> &str {
+        self.token.literal()
+    }
+
+    fn get_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl Expression for IfExpression {
+    fn expression_node(&self) {
+        todo!()
+    }
+
+    fn to_string(&self) -> String {
+        let mut string = "".to_string();
+        string.push_str("if");
+        if let Some(x) = &self.condition {
+            string.push_str(x.to_string().as_str());
+        };
+        string.push(' ');
+        if let Some(x) = &self.consequence {
+            string.push_str(x.to_string().as_str());
+        };
+        if let Some(x) = &self.alternative {
+            string.push_str("else ");
+            string.push_str(x.to_string().as_str());
+        };
+        string
+    }
+}
+
+pub struct BlockStatement {
+    token: Token,
+    pub statements: Vec<Box<dyn Statement>>,
+}
+
+impl BlockStatement {
+    #[allow(dead_code)]
+    pub fn new(token: Token, statements: Vec<Box<dyn Statement>>) -> Self {
+        Self { token, statements }
+    }
+}
+
+impl Node for BlockStatement {
+    fn token_literal(&self) -> &str {
+        self.token.literal()
+    }
+
+    fn get_name(&self) -> &'static str {
+        "BlockStatement"
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl Statement for BlockStatement {
+    fn statement_node(&self) {
+        todo!()
+    }
+
+    fn to_string(&self) -> String {
+        let mut string = "".to_string();
+        for statement in &self.statements {
+            string.push_str(statement.to_string().as_str());
+        }
+        string
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

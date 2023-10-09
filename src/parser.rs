@@ -206,8 +206,48 @@ impl<'a> Parser<'a> {
             Token::True => self.parse_boolean(),
             Token::False => self.parse_boolean(),
             Token::Lparen => self.parse_grouped_expression(),
+            Token::IF => self.parse_if_expression(),
             _ => None,
         }
+    }
+
+    fn parse_if_expression(&mut self) -> Option<Box<dyn Expression>> {
+        let mut expression = IfExpression::new(self.current_token.clone(), None, None, None);
+        if !self.expect_peek(&Token::Lparen) {
+            return None;
+        }
+        self.next_token();
+        expression.condition = self.parse_expression(Precedences::Lowest);
+        if !self.expect_peek(&Token::Rparen) {
+            return None;
+        }
+        if !self.expect_peek(&Token::Lbrace) {
+            return None;
+        }
+        expression.consequence = self.parse_block_statement();
+        if matches!(self.peek_token, Token::Else) {
+            self.next_token();
+            if !self.expect_peek(&Token::Lbrace) {
+                return None;
+            }
+            expression.alternative = self.parse_block_statement();
+        }
+        Some(Box::new(expression))
+    }
+
+    fn parse_block_statement(&mut self) -> Option<BlockStatement> {
+        let mut block = BlockStatement::new(self.current_token.clone(), Vec::new());
+        self.next_token();
+        while !matches!(self.current_token, Token::Rbrace)
+            && !matches!(self.current_token, Token::Eof)
+        {
+            let statement = self.parse_statement();
+            if let Some(x) = statement {
+                block.statements.push(x)
+            }
+            self.next_token();
+        }
+        Some(block)
     }
 
     fn parse_grouped_expression(&mut self) -> Option<Box<dyn Expression>> {
@@ -856,6 +896,54 @@ mod tests {
             let program = parser.parse_program();
             check_parser_errors(&parser);
             assert_eq!(program.to_string(), test.expected)
+        }
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let test_input = "if (x < y) { x }";
+        let lexer = Lexer::new(test_input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "There should be exactly one program statements"
+        );
+        for statement in &program.statements {
+            match statement.as_any().downcast_ref::<ExpressionStatement>() {
+                Some(expr) => {
+                    match expr
+                        .expression
+                        .as_ref()
+                        .expect("Expecting expression")
+                        .as_any()
+                        .downcast_ref::<IfExpression>()
+                    {
+                        Some(expr) => {
+                            assert!(expr.alternative.is_none());
+                            assert_eq!(expr.condition.as_ref().unwrap().token_literal(), "<");
+                            assert_eq!(expr.consequence.as_ref().unwrap().statements.len(), 1);
+                            match expr
+                                .consequence
+                                .as_ref()
+                                .unwrap()
+                                .statements
+                                .first()
+                                .expect("Expecting statement")
+                                .as_any()
+                                .downcast_ref::<ExpressionStatement>()
+                            {
+                                Some(expr) => check_identifier_expression(expr, "x"),
+                                None => panic!("statement is not ExpressionStatement"),
+                            };
+                        }
+                        None => panic!("expression is not IfExpression"),
+                    };
+                }
+                None => panic!("statement is not ExpressionStatement"),
+            };
         }
     }
 }
