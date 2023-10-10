@@ -28,6 +28,7 @@ impl Precedences {
             Token::Minus => Sum,
             Token::Slash => Product,
             Token::Asterisk => Product,
+            Token::Lparen => Precedences::Call,
             _ => Lowest,
         }
     }
@@ -369,8 +370,48 @@ impl<'a> Parser<'a> {
             | Token::NOT_EQ
             | Token::LT
             | Token::GT => self.parse_infix_expression(expression),
+            Token::Lparen => self.parse_call_expression(expression),
             _ => None,
         }
+    }
+
+    fn parse_call_expression(
+        &mut self,
+        function: Box<dyn Expression>,
+    ) -> Option<Box<dyn Expression>> {
+        let mut expression =
+            CallExpression::new(self.current_token.clone(), Some(function), Vec::new());
+        expression.arguments = self.parse_call_arguments();
+        Some(Box::new(expression))
+    }
+
+    fn parse_call_arguments(&mut self) -> Vec<Box<dyn Expression>> {
+        let mut arguments = Vec::new();
+        if matches!(self.peek_token, Token::Rparen) {
+            self.next_token();
+            return arguments;
+        }
+        self.next_token();
+        arguments.push(
+            self.parse_expression(Precedences::Lowest)
+                .unwrap_or_else(|| {
+                    panic!("parse_call_arguments error: expression cannot be None!")
+                }),
+        );
+        while matches!(self.peek_token, Token::Comma) {
+            self.next_token();
+            self.next_token();
+            arguments.push(
+                self.parse_expression(Precedences::Lowest)
+                    .unwrap_or_else(|| {
+                        panic!("parse_call_arguments error: expression cannot be None!")
+                    }),
+            );
+        }
+        if !self.expect_peek(&Token::Rparen) {
+            return Vec::new();
+        }
+        arguments
     }
 
     fn check_infixes(&self, token: &Token) -> bool {
@@ -384,6 +425,7 @@ impl<'a> Parser<'a> {
                 | Token::NOT_EQ
                 | Token::LT
                 | Token::GT
+                | Token::Lparen
         )
     }
 }
@@ -930,6 +972,18 @@ mod tests {
                 String::from("!(true == true)"),
                 String::from("(!(true == true))"),
             ),
+            Test::new(
+                String::from("a + add(b * c) + d"),
+                String::from("((a + add((b * c))) + d)"),
+            ),
+            Test::new(
+                String::from("add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))"),
+                String::from("add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))"),
+            ),
+            Test::new(
+                String::from("add(a + b + c * d / f + g)"),
+                String::from("add((((a + b) + ((c * d) / f)) + g))"),
+            ),
         ];
         for test in test_inputs {
             let lexer = Lexer::new(&test.input);
@@ -1125,6 +1179,71 @@ mod tests {
                     None => panic!("statement is not ExpressionStatement"),
                 };
             }
+        }
+    }
+
+    #[test]
+    fn test_call_parameter_parsing() {
+        let test_input = "add(1, 2 * 3, 4 + 5);";
+        let lexer = Lexer::new(test_input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "There should be exactly one program statements"
+        );
+        for statement in &program.statements {
+            match statement.as_any().downcast_ref::<ExpressionStatement>() {
+                Some(expr) => {
+                    match expr
+                        .expression
+                        .as_ref()
+                        .expect("Expecting expression")
+                        .as_any()
+                        .downcast_ref::<CallExpression>()
+                    {
+                        Some(expr) => {
+                            assert_eq!(expr.arguments.len(), 3);
+                            match expr.arguments[0]
+                                .as_ref()
+                                .as_any()
+                                .downcast_ref::<IntegerLiteral>()
+                            {
+                                Some(expr) => assert_eq!(expr.value, 1),
+                                None => panic!("expression is not IntegerLiteral"),
+                            };
+                            match expr.arguments[1]
+                                .as_ref()
+                                .as_any()
+                                .downcast_ref::<InfixExpression>()
+                            {
+                                Some(expr) => {
+                                    check_integer_literal(&expr.left, 2);
+                                    check_integer_literal(&expr.right, 3);
+                                    assert_eq!(expr.operator, "*");
+                                }
+                                None => panic!("expression is not InfixExpression"),
+                            };
+                            match expr.arguments[2]
+                                .as_ref()
+                                .as_any()
+                                .downcast_ref::<InfixExpression>()
+                            {
+                                Some(expr) => {
+                                    check_integer_literal(&expr.left, 4);
+                                    check_integer_literal(&expr.right, 5);
+                                    assert_eq!(expr.operator, "+");
+                                }
+                                None => panic!("expression is not InfixExpression"),
+                            };
+                        }
+                        None => panic!("expression is not CallExpression"),
+                    };
+                }
+                None => panic!("statement is not ExpressionStatement"),
+            };
         }
     }
 }

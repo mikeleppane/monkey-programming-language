@@ -554,6 +554,64 @@ impl Expression for FunctionLiteral {
     }
 }
 
+pub struct CallExpression {
+    token: Token,
+    pub function: Option<Box<dyn Expression>>,
+    pub arguments: Vec<Box<dyn Expression>>,
+}
+
+impl CallExpression {
+    #[allow(dead_code)]
+    pub fn new(
+        token: Token,
+        function: Option<Box<dyn Expression>>,
+        arguments: Vec<Box<dyn Expression>>,
+    ) -> Self {
+        Self {
+            token,
+            function,
+            arguments,
+        }
+    }
+}
+
+impl Node for CallExpression {
+    fn token_literal(&self) -> &str {
+        self.token.literal()
+    }
+
+    fn get_name(&self) -> &'static str {
+        "CallExpression"
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl Expression for CallExpression {
+    fn expression_node(&self) {
+        todo!()
+    }
+
+    fn to_string(&self) -> String {
+        let mut string = "".to_string();
+        let args = self
+            .arguments
+            .iter()
+            .map(|a| a.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+        if let Some(x) = &self.function {
+            string.push_str(x.to_string().as_str());
+        };
+        string.push('(');
+        string.push_str(args.as_str());
+        string.push(')');
+        string
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
