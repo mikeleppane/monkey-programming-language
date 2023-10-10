@@ -207,8 +207,49 @@ impl<'a> Parser<'a> {
             Token::False => self.parse_boolean(),
             Token::Lparen => self.parse_grouped_expression(),
             Token::IF => self.parse_if_expression(),
+            Token::Function => self.parse_function_literal(),
             _ => None,
         }
+    }
+
+    fn parse_function_literal(&mut self) -> Option<Box<dyn Expression>> {
+        let mut literal = FunctionLiteral::new(self.current_token.clone(), Vec::new(), None);
+        if !self.expect_peek(&Token::Lparen) {
+            return None;
+        }
+        literal.parameters = self.parse_function_parameters();
+        if !self.expect_peek(&Token::Lbrace) {
+            return None;
+        }
+        literal.body = self.parse_block_statement();
+        Some(Box::new(literal))
+    }
+
+    fn parse_function_parameters(&mut self) -> Vec<Identifier> {
+        let mut identifiers = Vec::new();
+        if matches!(self.peek_token, Token::Rparen) {
+            self.next_token();
+            return identifiers;
+        }
+        self.next_token();
+        let identifier = Identifier::new(
+            self.current_token.clone(),
+            self.current_token.literal().to_string(),
+        );
+        identifiers.push(identifier);
+        while matches!(self.peek_token, Token::Comma) {
+            self.next_token();
+            self.next_token();
+            let identifier = Identifier::new(
+                self.current_token.clone(),
+                self.current_token.literal().to_string(),
+            );
+            identifiers.push(identifier);
+        }
+        if !self.expect_peek(&Token::Rparen) {
+            return Vec::new();
+        }
+        identifiers
     }
 
     fn parse_if_expression(&mut self) -> Option<Box<dyn Expression>> {
@@ -944,6 +985,146 @@ mod tests {
                 }
                 None => panic!("statement is not ExpressionStatement"),
             };
+        }
+    }
+
+    #[test]
+    fn test_function_literal_parsing() {
+        let test_input = "fn(x, y) { x + y; }";
+        let lexer = Lexer::new(test_input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        check_parser_errors(&parser);
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "There should be exactly one program statements"
+        );
+        for statement in &program.statements {
+            match statement.as_any().downcast_ref::<ExpressionStatement>() {
+                Some(expr) => {
+                    match expr
+                        .expression
+                        .as_ref()
+                        .expect("Expecting expression")
+                        .as_any()
+                        .downcast_ref::<FunctionLiteral>()
+                    {
+                        Some(expr) => {
+                            assert_eq!(expr.parameters.len(), 2);
+                            assert_eq!(expr.parameters[0].value, "x");
+                            assert_eq!(expr.parameters[1].value, "y");
+                            assert_eq!(expr.body.as_ref().unwrap().statements.len(), 1);
+                            match expr
+                                .body
+                                .as_ref()
+                                .unwrap()
+                                .statements
+                                .first()
+                                .expect("Expecting statement")
+                                .as_any()
+                                .downcast_ref::<ExpressionStatement>()
+                            {
+                                Some(expr) => {
+                                    match expr
+                                        .expression
+                                        .as_ref()
+                                        .expect("Expecting expression")
+                                        .as_any()
+                                        .downcast_ref::<InfixExpression>()
+                                    {
+                                        Some(expr) => {
+                                            match expr
+                                                .left
+                                                .as_ref()
+                                                .unwrap()
+                                                .as_any()
+                                                .downcast_ref::<Identifier>()
+                                            {
+                                                Some(ident) => assert_eq!(ident.value, "x"),
+                                                None => panic!("expression is not Identifier"),
+                                            };
+                                            match expr
+                                                .right
+                                                .as_ref()
+                                                .unwrap()
+                                                .as_any()
+                                                .downcast_ref::<Identifier>()
+                                            {
+                                                Some(ident) => assert_eq!(ident.value, "y"),
+                                                None => panic!("expression is not Identifier"),
+                                            };
+                                            assert_eq!(expr.operator, "+");
+                                        }
+                                        None => panic!("expression is not InfixExpression"),
+                                    };
+                                }
+                                None => panic!("statement is not ExpressionStatement"),
+                            };
+                        }
+                        None => panic!("expression is not FunctionLiteral"),
+                    };
+                }
+                None => panic!("statement is not ExpressionStatement"),
+            };
+        }
+    }
+
+    #[test]
+    fn test_function_parameter_parsing() {
+        struct Test {
+            input: String,
+            expected_params: Vec<String>,
+        }
+        impl Test {
+            fn new(input: String, expected_params: Vec<String>) -> Self {
+                Self {
+                    input,
+                    expected_params,
+                }
+            }
+        }
+
+        let test_inputs = vec![
+            Test::new(String::from("fn() {};"), Vec::new()),
+            Test::new(String::from("fn(x) {};"), vec![String::from("x")]),
+            Test::new(
+                String::from("fn(x, y, z) {};"),
+                vec![String::from("x"), String::from("y"), String::from("z")],
+            ),
+        ];
+        for test in &test_inputs {
+            let lexer = Lexer::new(&test.input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parser_errors(&parser);
+            assert_eq!(
+                program.statements.len(),
+                1,
+                "There should be exactly one program statements"
+            );
+            for statement in &program.statements {
+                match statement.as_any().downcast_ref::<ExpressionStatement>() {
+                    Some(expr) => {
+                        match expr
+                            .expression
+                            .as_ref()
+                            .expect("Expecting expression")
+                            .as_any()
+                            .downcast_ref::<FunctionLiteral>()
+                        {
+                            Some(expr) => {
+                                assert_eq!(expr.parameters.len(), test.expected_params.len());
+                                for (index, param) in expr.parameters.iter().enumerate() {
+                                    assert_eq!(param.value, test.expected_params[index]);
+                                }
+                            }
+                            None => panic!("expression is not FunctionLiteral"),
+                        };
+                    }
+                    None => panic!("statement is not ExpressionStatement"),
+                };
+            }
         }
     }
 }

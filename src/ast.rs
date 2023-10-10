@@ -499,6 +499,61 @@ impl Statement for BlockStatement {
     }
 }
 
+pub struct FunctionLiteral {
+    token: Token,
+    pub parameters: Vec<Identifier>,
+    pub body: Option<BlockStatement>,
+}
+
+impl FunctionLiteral {
+    #[allow(dead_code)]
+    pub fn new(token: Token, parameters: Vec<Identifier>, body: Option<BlockStatement>) -> Self {
+        Self {
+            token,
+            parameters,
+            body,
+        }
+    }
+}
+
+impl Node for FunctionLiteral {
+    fn token_literal(&self) -> &str {
+        self.token.literal()
+    }
+
+    fn get_name(&self) -> &'static str {
+        "FunctionLiteral"
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl Expression for FunctionLiteral {
+    fn expression_node(&self) {
+        todo!()
+    }
+
+    fn to_string(&self) -> String {
+        let mut string = "".to_string();
+        let params = self
+            .parameters
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+        string.push_str(self.token_literal());
+        string.push('(');
+        string.push_str(params.as_str());
+        string.push(')');
+        if let Some(x) = &self.body {
+            string.push_str(x.to_string().as_str());
+        };
+        string
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
