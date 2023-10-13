@@ -132,7 +132,7 @@ impl Statement for LetStatement {
 
 pub struct ReturnStatement {
     token: Token,
-    return_value: Option<Box<dyn Expression>>,
+    pub return_value: Option<Box<dyn Expression>>,
 }
 
 impl ReturnStatement {

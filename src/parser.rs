@@ -35,16 +35,16 @@ impl Precedences {
 }
 
 #[allow(dead_code)]
-struct Parser<'a> {
+pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Token,
     peek_token: Token,
-    errors: Vec<String>,
+    pub errors: Vec<String>,
 }
 
 impl<'a> Parser<'a> {
     #[allow(dead_code)]
-    fn new(lexer: Lexer<'a>) -> Self {
+    pub fn new(lexer: Lexer<'a>) -> Self {
         let mut parser = Parser {
             lexer,
             current_token: Token::Empty,
@@ -61,7 +61,7 @@ impl<'a> Parser<'a> {
         self.peek_token = self.lexer.next_token();
     }
 
-    fn parse_program(&mut self) -> Program {
+    pub fn parse_program(&mut self) -> Program {
         let mut program = Program {
             statements: Vec::new(),
         };
@@ -144,6 +144,9 @@ impl<'a> Parser<'a> {
             return None;
         }
 
+        self.next_token();
+        statement.value = self.parse_expression(Precedences::Lowest);
+
         while !matches!(self.current_token, Token::Semicolon) {
             self.next_token();
         }
@@ -151,8 +154,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_return_statement(&mut self) -> Option<ReturnStatement> {
-        let statement = ReturnStatement::new(self.current_token.clone());
+        let mut statement = ReturnStatement::new(self.current_token.clone());
         self.next_token();
+
+        statement.return_value = self.parse_expression(Precedences::Lowest);
 
         while !matches!(self.current_token, Token::Semicolon) {
             self.next_token();
@@ -194,7 +199,7 @@ impl<'a> Parser<'a> {
         self.errors.push(message)
     }
 
-    fn errors(&self) -> &Vec<String> {
+    pub fn errors(&self) -> &Vec<String> {
         self.errors.as_ref()
     }
 
@@ -433,7 +438,7 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::assert_eq;
+    use std::{assert_eq, fmt::Display};
 
     fn check_parser_errors(parser: &Parser) {
         if parser.errors.is_empty() {
@@ -446,7 +451,7 @@ mod tests {
         panic!("Parser errors found!")
     }
 
-    fn check_let_statement(statement: &dyn Statement, name: &str) {
+    fn check_let_statement(statement: &dyn Statement, name: &str, value: impl Display) {
         assert_eq!(
             statement.token_literal(),
             "let",
@@ -470,6 +475,14 @@ mod tests {
             "Identifier's value is not {}! Got {}",
             name,
             let_stmt.name.token_literal()
+        );
+
+        assert_eq!(
+            let_stmt.value.as_ref().unwrap().to_string(),
+            value.to_string(),
+            "Value is not {}! Got {}",
+            value,
+            let_stmt.value.as_ref().unwrap().to_string()
         );
     }
 
@@ -561,24 +574,74 @@ mod tests {
 
     #[test]
     fn test_let_statements() {
-        let test_input = "let x = 5;\
-        let y = 10;\
-        let foobar = 838383;\
-        ";
-        let inputs = ["x", "y", "foobar"];
-        let lexer = Lexer::new(test_input);
+        struct TestCase<T: Display> {
+            input: String,
+            expected_identifier: String,
+            expected_value: T,
+        }
+
+        let test_inputs = (
+            TestCase::<i64> {
+                input: String::from("let x = 5;"),
+                expected_identifier: String::from("x"),
+                expected_value: 5,
+            },
+            TestCase::<bool> {
+                input: String::from("let y = true;"),
+                expected_identifier: String::from("y"),
+                expected_value: true,
+            },
+            TestCase::<&str> {
+                input: String::from("let foobar = y;"),
+                expected_identifier: String::from("foobar"),
+                expected_value: "y",
+            },
+        );
+        let lexer = Lexer::new(test_inputs.0.input.as_str());
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
         assert_eq!(
             program.statements.len(),
-            3,
-            "There should be three program statements"
+            1,
+            "There should be exactly one program statement"
         );
         check_parser_errors(&parser);
-        for (index, identifier) in inputs.iter().enumerate() {
-            let statement = &program.statements[index];
-            check_let_statement(statement.as_ref(), identifier)
-        }
+        let statement = &program.statements[0];
+        check_let_statement(
+            statement.as_ref(),
+            &test_inputs.0.expected_identifier,
+            test_inputs.0.expected_value,
+        );
+        let lexer = Lexer::new(test_inputs.1.input.as_str());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "There should be exactly one program statement"
+        );
+        check_parser_errors(&parser);
+        let statement = &program.statements[0];
+        check_let_statement(
+            statement.as_ref(),
+            &test_inputs.1.expected_identifier,
+            test_inputs.1.expected_value,
+        );
+        let lexer = Lexer::new(test_inputs.2.input.as_str());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "There should be exactly one program statement"
+        );
+        check_parser_errors(&parser);
+        let statement = &program.statements[0];
+        check_let_statement(
+            statement.as_ref(),
+            &test_inputs.2.expected_identifier,
+            test_inputs.2.expected_value,
+        );
     }
 
     #[test]
@@ -600,7 +663,7 @@ mod tests {
         check_parser_errors(&parser);
         for (index, identifier) in inputs.iter().enumerate() {
             let statement = &program.statements[index];
-            check_let_statement(statement.as_ref(), identifier)
+            check_let_statement(statement.as_ref(), identifier, 5)
         }
     }
 
