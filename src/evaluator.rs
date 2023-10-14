@@ -1,6 +1,6 @@
 use crate::ast::{
-    Boolean, Expression, ExpressionStatement, InfixExpression, IntegerLiteral, PrefixExpression,
-    Program, Statement,
+    BlockStatement, Boolean, Expression, ExpressionStatement, IfExpression, InfixExpression,
+    IntegerLiteral, PrefixExpression, Program, Statement,
 };
 use crate::object::{Boolean as BooleanObject, Integer, Null, Object};
 
@@ -17,18 +17,28 @@ pub fn eval_program(program: &Program) -> Option<Box<dyn Object>> {
 }
 
 pub fn eval(node: &dyn Statement) -> Box<dyn Object> {
-    match node.as_any().downcast_ref::<ExpressionStatement>() {
-        Some(expr) => {
-            let expr = expr.expression.as_ref().unwrap().as_ref();
-            eval_expression(expr)
+    if let Some(expr) = node.as_any().downcast_ref::<ExpressionStatement>() {
+        if let Some(expr) = expr.expression.as_ref() {
+            return eval_expression(expr.as_ref());
         }
-        None => unimplemented!(),
     }
+
+    if let Some(stmt) = node.as_any().downcast_ref::<BlockStatement>() {
+        if let Some(ret) = eval_statements(&stmt.statements) {
+            return ret;
+        }
+    }
+
+    unimplemented!("{}", node.to_string());
 }
 
-/* pub fn eval_statement() -> Box<dyn Object> {
-    unimplemented!()
-} */
+fn eval_statements(stmts: &Vec<Box<dyn Statement>>) -> Option<Box<dyn Object>> {
+    let mut result = None;
+    for statement in stmts {
+        result = Some(eval(statement.as_ref()));
+    }
+    result
+}
 
 pub fn eval_expression(node: &dyn Expression) -> Box<dyn Object> {
     if let Some(expr) = node.as_any().downcast_ref::<IntegerLiteral>() {
@@ -51,7 +61,31 @@ pub fn eval_expression(node: &dyn Expression) -> Box<dyn Object> {
         return eval_infix_expression(&expr.operator, left, right);
     }
 
+    if let Some(expr) = node.as_any().downcast_ref::<IfExpression>() {
+        return eval_if_expression(expr);
+    }
+
     unreachable!("unimplemented Expression: {:?}", node.to_string())
+}
+
+fn eval_if_expression(ie: &IfExpression) -> Box<dyn Object> {
+    let condition = eval_expression(ie.condition.as_ref().unwrap().as_ref());
+    if is_truthy(condition) {
+        return eval(ie.consequence.as_ref().unwrap());
+    } else if let Some(alt) = ie.alternative.as_ref() {
+        return eval(alt);
+    }
+    Box::new(NULL)
+}
+
+fn is_truthy(obj: Box<dyn Object>) -> bool {
+    if let Some(boolean) = obj.as_any().downcast_ref::<BooleanObject>() {
+        return boolean.value;
+    }
+    if let Some(integer) = obj.as_any().downcast_ref::<Integer>() {
+        return integer.value != 0;
+    }
+    false
 }
 
 fn eval_infix_expression(
@@ -191,6 +225,13 @@ mod tests {
         }
     }
 
+    fn check_null_object(obj: Box<dyn Object>) {
+        match obj.as_any().downcast_ref::<Null>() {
+            Some(_) => (),
+            None => panic!("object is not Null. got={}", obj.type_name().to_string()),
+        }
+    }
+
     #[test]
     fn test_eval_integer_expression() {
         let tests = vec![
@@ -274,6 +315,36 @@ mod tests {
             let evaluated = test_eval(input);
             if let Some(evaluated) = evaluated {
                 check_boolean_object(evaluated, expected)
+            } else {
+                panic!("evaluated is None")
+            }
+        }
+    }
+
+    #[test]
+    fn test_if_else_expressions_() {
+        let tests = vec![
+            ("if (true) { 10 }", Some(10)),
+            ("if (1) { 10 }", Some(10)),
+            ("if (1 < 2) { 10 }", Some(10)),
+            ("if (1 > 2) { 10 } else { 20 }", Some(20)),
+            ("if (1 < 2) { 10 } else { 20 }", Some(10)),
+            ("if (1 < 2) { 10 }", Some(10)),
+            ("if (false) { 10 } else { 20 }", Some(20)),
+            ("if (true) { 10 } else { 20 }", Some(10)),
+            ("if (1 > 2) { 10 }", None),
+            ("if (false) { 10 }", None),
+            ("if (1 < 2) { 10 }", Some(10)),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            if let Some(evaluated) = evaluated {
+                if let Some(expected) = expected {
+                    check_integer_object(evaluated, expected)
+                } else {
+                    check_null_object(evaluated)
+                }
             } else {
                 panic!("evaluated is None")
             }
