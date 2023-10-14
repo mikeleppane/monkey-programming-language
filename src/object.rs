@@ -45,6 +45,7 @@ impl Object for Integer {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Boolean {
     pub value: bool,
 }
