@@ -47,6 +47,20 @@ impl fmt::Display for Program {
     }
 }
 
+impl Node for Program {
+    fn token_literal(&self) -> &str {
+        "Program"
+    }
+
+    fn get_name(&self) -> &'static str {
+        "Program"
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier {
     pub token: Token,

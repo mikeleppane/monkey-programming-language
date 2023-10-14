@@ -1,3 +1,4 @@
+use crate::evaluator::eval_program;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use std::io::prelude::*;
@@ -57,8 +58,9 @@ pub fn start() {
             print_prompt();
             continue;
         }
+        let evaluated = eval_program(&program);
         println!("🐵");
-        println!("{}", program);
+        println!("{}", evaluated.inspect());
         print_prompt();
     }
 }
