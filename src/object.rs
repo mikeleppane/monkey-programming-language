@@ -45,8 +45,8 @@ impl Object for Integer {
     }
 }
 
-struct Boolean {
-    value: bool,
+pub struct Boolean {
+    pub value: bool,
 }
 
 impl Object for Boolean {
