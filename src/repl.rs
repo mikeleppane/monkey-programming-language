@@ -59,8 +59,10 @@ pub fn start() {
             continue;
         }
         let evaluated = eval_program(&program);
-        println!("🐵");
-        println!("{}", evaluated.inspect());
+        if let Some(evaluated) = evaluated {
+            println!("🐵");
+            println!("{}", evaluated.inspect());
+        }
         print_prompt();
     }
 }
