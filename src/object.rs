@@ -6,6 +6,7 @@ pub enum ObjectType {
     Boolean,
     Null,
     ReturnValue,
+    Error,
 }
 
 impl ToString for ObjectType {
@@ -15,6 +16,7 @@ impl ToString for ObjectType {
             ObjectType::Boolean => "BOOLEAN".to_string(),
             ObjectType::Null => "NULL".to_string(),
             ObjectType::ReturnValue => "RETURN_VALUE".to_string(),
+            ObjectType::Error => "ERROR".to_string(),
         }
     }
 }
@@ -131,10 +133,54 @@ impl ReturnValue {
         if let Some(return_value) = self.value.as_any().downcast_ref::<ReturnValue>() {
             return return_value.get_return_value();
         }
+
+        if let Some(error) = self.value.as_any().downcast_ref::<Error>() {
+            return error.into();
+        }
         unreachable!(
             "Could not get return value from object ({}): {}",
             self.type_name().to_string(),
             self.to_string()
         )
+    }
+}
+
+pub struct Error {
+    pub message: String,
+}
+
+impl Error {
+    pub fn new(message: String) -> Self {
+        Error { message }
+    }
+
+    pub fn is_error(obj: &dyn Object) -> bool {
+        obj.type_name() == ObjectType::Error
+    }
+}
+
+impl Object for Error {
+    fn type_name(&self) -> ObjectType {
+        ObjectType::ReturnValue
+    }
+
+    fn to_string(&self) -> String {
+        format!("ERROR: {}", self.message)
+    }
+
+    fn inspect(&self) -> String {
+        self.to_string()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl From<&Error> for Box<dyn Object> {
+    fn from(error: &Error) -> Self {
+        Box::new(Error {
+            message: error.message.clone(),
+        })
     }
 }

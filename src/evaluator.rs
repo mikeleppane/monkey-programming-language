@@ -2,7 +2,9 @@ use crate::ast::{
     BlockStatement, Boolean, Expression, ExpressionStatement, IfExpression, InfixExpression,
     IntegerLiteral, PrefixExpression, Program, ReturnStatement, Statement,
 };
-use crate::object::{Boolean as BooleanObject, Integer, Null, Object, ObjectType, ReturnValue};
+use crate::object::{
+    Boolean as BooleanObject, Error, Integer, Null, Object, ObjectType, ReturnValue,
+};
 
 const TRUE: BooleanObject = BooleanObject { value: true };
 const FALSE: BooleanObject = BooleanObject { value: false };
@@ -23,7 +25,9 @@ pub fn eval(node: &dyn Statement) -> Box<dyn Object> {
         let mut result = None;
         for item in &stmt.statements {
             let ret = eval(item.as_ref());
-            if ret.as_ref().type_name() == ObjectType::ReturnValue {
+            if ret.as_ref().type_name() == ObjectType::ReturnValue
+                || ret.as_ref().type_name() == ObjectType::Error
+            {
                 return ret;
             }
             result = Some(ret);
@@ -31,18 +35,23 @@ pub fn eval(node: &dyn Statement) -> Box<dyn Object> {
         if let Some(ret) = result {
             return ret;
         }
-        return Box::new(NULL);
+        return Box::new(Error::new("block statement is empty".to_string()));
     }
 
     if let Some(stmt) = node.as_any().downcast_ref::<ReturnStatement>() {
         if let Some(ret_value) = stmt.return_value.as_ref() {
             let value = eval_expression(ret_value.as_ref());
+            if Error::is_error(value.as_ref()) {
+                return value;
+            }
             return Box::new(ReturnValue { value });
         }
-        return Box::new(NULL);
+        return Box::new(Error::new("return statement is empty".to_string()));
     }
-
-    unimplemented!("{}", node.to_string());
+    Box::new(Error::new(format!(
+        "unimplemented Statement: {:?}",
+        node.to_string()
+    )))
 }
 
 fn eval_statements(stmts: &Vec<Box<dyn Statement>>) -> Option<Box<dyn Object>> {
@@ -51,6 +60,9 @@ fn eval_statements(stmts: &Vec<Box<dyn Statement>>) -> Option<Box<dyn Object>> {
         let ret = eval(statement.as_ref());
         if let Some(ret_value) = ret.as_any().downcast_ref::<ReturnValue>() {
             return Some(ret_value.get_return_value());
+        }
+        if let Some(error) = ret.as_any().downcast_ref::<Error>() {
+            return Some(error.into());
         }
         result = Some(ret);
     }
@@ -70,23 +82,35 @@ pub fn eval_expression(node: &dyn Expression) -> Box<dyn Object> {
     if let Some(expr) = node.as_any().downcast_ref::<PrefixExpression>() {
         if let Some(right) = expr.right.as_ref() {
             let right = eval_expression(right.as_ref());
+            if Error::is_error(right.as_ref()) {
+                return right;
+            }
             return eval_prefix_expression(&expr.operator, right);
         }
-        return Box::new(NULL);
+        return Box::new(Error::new("right expression is empty".to_string()));
     }
 
     if let Some(expr) = node.as_any().downcast_ref::<InfixExpression>() {
         let right = if let Some(right) = expr.right.as_ref() {
             eval_expression(right.as_ref())
         } else {
-            Box::new(NULL)
+            Box::new(Error::new("right expression is empty".to_string()))
         };
+        if Error::is_error(right.as_ref()) {
+            return right;
+        }
 
         let left = if let Some(left) = expr.left.as_ref() {
+            if Error::is_error(right.as_ref()) {
+                return right;
+            }
             eval_expression(left.as_ref())
         } else {
-            Box::new(NULL)
+            Box::new(Error::new("left expression is empty".to_string()))
         };
+        if Error::is_error(left.as_ref()) {
+            return left;
+        }
         return eval_infix_expression(&expr.operator, left, right);
     }
 
@@ -103,6 +127,9 @@ fn eval_if_expression(ie: &IfExpression) -> Box<dyn Object> {
     } else {
         Box::new(NULL)
     };
+    if Error::is_error(condition.as_ref()) {
+        return condition;
+    }
     if is_truthy(condition) {
         let consequence = if let Some(consequence) = ie.consequence.as_ref() {
             consequence
@@ -144,9 +171,20 @@ fn eval_infix_expression(
             if operator == "!=" {
                 return native_bool_to_boolean_object(left != right);
             }
+            return Box::new(Error::new(format!(
+                "unknown operator: {} {} {}",
+                left.type_name().to_string(),
+                operator,
+                right.type_name().to_string()
+            )));
         }
     }
-    Box::new(NULL)
+    Box::new(Error::new(format!(
+        "type mismatch: {} {} {}",
+        left.type_name().to_string(),
+        operator,
+        right.type_name().to_string()
+    )))
 }
 
 fn native_bool_to_boolean_object(input: bool) -> Box<dyn Object> {
@@ -198,7 +236,12 @@ fn eval_integer_infix_expression(
             }
             Box::new(FALSE)
         }
-        _ => Box::new(NULL),
+        _ => Box::new(Error::new(format!(
+            "unknown operator: {} {} {}",
+            left.type_name().to_string(),
+            operator,
+            right.type_name().to_string()
+        ))),
     }
 }
 
@@ -206,7 +249,11 @@ fn eval_prefix_expression(operator: &str, right: Box<dyn Object>) -> Box<dyn Obj
     match operator {
         "!" => eval_bang_operator_expression(right),
         "-" => eval_minus_prefix_operator_expression(right),
-        _ => Box::new(NULL),
+        _ => Box::new(Error::new(format!(
+            "unknown operator: {}{}",
+            operator,
+            right.type_name().to_string()
+        ))),
     }
 }
 
@@ -231,7 +278,10 @@ fn eval_minus_prefix_operator_expression(right: Box<dyn Object>) -> Box<dyn Obje
         Some(integer) => Box::new(Integer {
             value: -integer.value,
         }),
-        None => Box::new(NULL),
+        None => Box::new(Error::new(format!(
+            "unknown operator: -{}",
+            right.type_name().to_string()
+        ))),
     }
 }
 
@@ -409,6 +459,40 @@ mod tests {
             let evaluated = test_eval(input);
             if let Some(evaluated) = evaluated {
                 check_integer_object(evaluated, expected)
+            } else {
+                panic!("evaluated is None")
+            }
+        }
+    }
+
+    #[test]
+    fn test_error_handling() {
+        let tests = vec![
+            ("5 + true;", "type mismatch: INTEGER + BOOLEAN"),
+            ("5 + true; 5", "type mismatch: INTEGER + BOOLEAN"),
+            ("-true", "unknown operator: -BOOLEAN"),
+            ("true + false;", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"),
+            (
+                "if (10 > 1) { true + false; }",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+            (
+                "if (10 > 1) { if (10 > 1) {return true + false;} return 1;}",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            if let Some(evaluated) = evaluated {
+                match evaluated.as_any().downcast_ref::<Error>() {
+                    Some(error) => assert_eq!(error.message, expected),
+                    None => panic!(
+                        "object is not Error. got={}",
+                        evaluated.type_name().to_string()
+                    ),
+                }
             } else {
                 panic!("evaluated is None")
             }
