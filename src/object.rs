@@ -1,9 +1,11 @@
 use std::any::Any;
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum ObjectType {
     Integer,
     Boolean,
     Null,
+    ReturnValue,
 }
 
 impl ToString for ObjectType {
@@ -12,6 +14,7 @@ impl ToString for ObjectType {
             ObjectType::Integer => "INTEGER".to_string(),
             ObjectType::Boolean => "BOOLEAN".to_string(),
             ObjectType::Null => "NULL".to_string(),
+            ObjectType::ReturnValue => "RETURN_VALUE".to_string(),
         }
     }
 }
@@ -85,5 +88,49 @@ impl Object for Null {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+pub struct ReturnValue {
+    pub value: Box<dyn Object>,
+}
+
+impl Object for ReturnValue {
+    fn type_name(&self) -> ObjectType {
+        ObjectType::ReturnValue
+    }
+
+    fn to_string(&self) -> String {
+        self.value.to_string()
+    }
+
+    fn inspect(&self) -> String {
+        self.value.inspect()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl ReturnValue {
+    pub fn get_return_value(&self) -> Box<dyn Object> {
+        if let Some(integer) = self.value.as_any().downcast_ref::<Integer>() {
+            return Box::new(Integer {
+                value: integer.value,
+            });
+        }
+        if let Some(boolean) = self.value.as_any().downcast_ref::<Boolean>() {
+            return Box::new(Boolean {
+                value: boolean.value,
+            });
+        }
+        if self.value.as_any().downcast_ref::<Null>().is_some() {
+            return Box::new(Null {});
+        }
+        if let Some(return_value) = self.value.as_any().downcast_ref::<ReturnValue>() {
+            return return_value.get_return_value();
+        }
+        panic!("unreachable");
     }
 }

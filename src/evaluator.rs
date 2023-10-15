@@ -1,19 +1,15 @@
 use crate::ast::{
     BlockStatement, Boolean, Expression, ExpressionStatement, IfExpression, InfixExpression,
-    IntegerLiteral, PrefixExpression, Program, Statement,
+    IntegerLiteral, PrefixExpression, Program, ReturnStatement, Statement,
 };
-use crate::object::{Boolean as BooleanObject, Integer, Null, Object};
+use crate::object::{Boolean as BooleanObject, Integer, Null, Object, ObjectType, ReturnValue};
 
 const TRUE: BooleanObject = BooleanObject { value: true };
 const FALSE: BooleanObject = BooleanObject { value: false };
 const NULL: Null = Null {};
 
 pub fn eval_program(program: &Program) -> Option<Box<dyn Object>> {
-    let mut result = None;
-    for statement in &program.statements {
-        result = Some(eval(statement.as_ref()));
-    }
-    result
+    eval_statements(&program.statements)
 }
 
 pub fn eval(node: &dyn Statement) -> Box<dyn Object> {
@@ -24,9 +20,19 @@ pub fn eval(node: &dyn Statement) -> Box<dyn Object> {
     }
 
     if let Some(stmt) = node.as_any().downcast_ref::<BlockStatement>() {
-        if let Some(ret) = eval_statements(&stmt.statements) {
-            return ret;
+        let mut result = None;
+        for item in &stmt.statements {
+            result = Some(eval(item.as_ref()));
+            if result.as_ref().unwrap().type_name() == ObjectType::ReturnValue {
+                return result.unwrap();
+            }
         }
+        return result.unwrap();
+    }
+
+    if let Some(stmt) = node.as_any().downcast_ref::<ReturnStatement>() {
+        let value = eval_expression(stmt.return_value.as_ref().unwrap().as_ref());
+        return Box::new(ReturnValue { value });
     }
 
     unimplemented!("{}", node.to_string());
@@ -35,7 +41,11 @@ pub fn eval(node: &dyn Statement) -> Box<dyn Object> {
 fn eval_statements(stmts: &Vec<Box<dyn Statement>>) -> Option<Box<dyn Object>> {
     let mut result = None;
     for statement in stmts {
-        result = Some(eval(statement.as_ref()));
+        let ret = eval(statement.as_ref());
+        if let Some(ret_value) = ret.as_any().downcast_ref::<ReturnValue>() {
+            return Some(ret_value.get_return_value());
+        }
+        result = Some(ret);
     }
     result
 }
@@ -208,6 +218,8 @@ mod tests {
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
 
+        println!("{}", program.to_string());
+
         eval_program(&program)
     }
 
@@ -345,6 +357,30 @@ mod tests {
                 } else {
                     check_null_object(evaluated)
                 }
+            } else {
+                panic!("evaluated is None")
+            }
+        }
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let tests = vec![
+            ("return 10;", 10),
+            ("return 10;9;", 10),
+            ("return 2 * 5; 9;", 10),
+            ("9; return 2 * 5; 9;", 10),
+            ("if (10 > 1) { if (10 > 1) {return 10;} return 1;}", 10),
+            (
+                "if (10 > 1) { if (10 > 1) { if (true) { return -1;} return 10;} return 1;}",
+                -1,
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            if let Some(evaluated) = evaluated {
+                check_integer_object(evaluated, expected)
             } else {
                 panic!("evaluated is None")
             }
