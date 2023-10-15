@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::ast::{
     BlockStatement, Boolean, Expression, ExpressionStatement, IfExpression, InfixExpression,
     IntegerLiteral, PrefixExpression, Program, ReturnStatement, Statement,
@@ -10,11 +12,11 @@ const TRUE: BooleanObject = BooleanObject { value: true };
 const FALSE: BooleanObject = BooleanObject { value: false };
 const NULL: Null = Null {};
 
-pub fn eval_program(program: &Program) -> Option<Box<dyn Object>> {
+pub fn eval_program(program: &Program) -> Option<Rc<dyn Object>> {
     eval_statements(&program.statements)
 }
 
-pub fn eval(node: &dyn Statement) -> Box<dyn Object> {
+pub fn eval(node: &dyn Statement) -> Rc<dyn Object> {
     if let Some(expr) = node.as_any().downcast_ref::<ExpressionStatement>() {
         if let Some(expr) = expr.expression.as_ref() {
             return eval_expression(expr.as_ref());
@@ -35,7 +37,7 @@ pub fn eval(node: &dyn Statement) -> Box<dyn Object> {
         if let Some(ret) = result {
             return ret;
         }
-        return Box::new(Error::new("block statement is empty".to_string()));
+        return Rc::new(Error::new("block statement is empty".to_string()));
     }
 
     if let Some(stmt) = node.as_any().downcast_ref::<ReturnStatement>() {
@@ -44,17 +46,17 @@ pub fn eval(node: &dyn Statement) -> Box<dyn Object> {
             if Error::is_error(value.as_ref()) {
                 return value;
             }
-            return Box::new(ReturnValue { value });
+            return Rc::new(ReturnValue { value });
         }
-        return Box::new(Error::new("return statement is empty".to_string()));
+        return Rc::new(Error::new("return statement is empty".to_string()));
     }
-    Box::new(Error::new(format!(
+    Rc::new(Error::new(format!(
         "unimplemented Statement: {:?}",
         node.to_string()
     )))
 }
 
-fn eval_statements(stmts: &Vec<Box<dyn Statement>>) -> Option<Box<dyn Object>> {
+fn eval_statements(stmts: &Vec<Box<dyn Statement>>) -> Option<Rc<dyn Object>> {
     let mut result = None;
     for statement in stmts {
         let ret = eval(statement.as_ref());
@@ -69,15 +71,15 @@ fn eval_statements(stmts: &Vec<Box<dyn Statement>>) -> Option<Box<dyn Object>> {
     result
 }
 
-pub fn eval_expression(node: &dyn Expression) -> Box<dyn Object> {
+pub fn eval_expression(node: &dyn Expression) -> Rc<dyn Object> {
     if let Some(expr) = node.as_any().downcast_ref::<IntegerLiteral>() {
-        return Box::new(Integer { value: expr.value });
+        return Rc::new(Integer { value: expr.value });
     }
     if let Some(expr) = node.as_any().downcast_ref::<Boolean>() {
         if expr.value {
-            return Box::new(TRUE);
+            return Rc::new(TRUE);
         }
-        return Box::new(FALSE);
+        return Rc::new(FALSE);
     }
     if let Some(expr) = node.as_any().downcast_ref::<PrefixExpression>() {
         if let Some(right) = expr.right.as_ref() {
@@ -87,14 +89,14 @@ pub fn eval_expression(node: &dyn Expression) -> Box<dyn Object> {
             }
             return eval_prefix_expression(&expr.operator, right);
         }
-        return Box::new(Error::new("right expression is empty".to_string()));
+        return Rc::new(Error::new("right expression is empty".to_string()));
     }
 
     if let Some(expr) = node.as_any().downcast_ref::<InfixExpression>() {
         let right = if let Some(right) = expr.right.as_ref() {
             eval_expression(right.as_ref())
         } else {
-            Box::new(Error::new("right expression is empty".to_string()))
+            Rc::new(Error::new("right expression is empty".to_string()))
         };
         if Error::is_error(right.as_ref()) {
             return right;
@@ -106,7 +108,7 @@ pub fn eval_expression(node: &dyn Expression) -> Box<dyn Object> {
             }
             eval_expression(left.as_ref())
         } else {
-            Box::new(Error::new("left expression is empty".to_string()))
+            Rc::new(Error::new("left expression is empty".to_string()))
         };
         if Error::is_error(left.as_ref()) {
             return left;
@@ -121,11 +123,11 @@ pub fn eval_expression(node: &dyn Expression) -> Box<dyn Object> {
     unreachable!("unimplemented Expression: {:?}", node.to_string())
 }
 
-fn eval_if_expression(ie: &IfExpression) -> Box<dyn Object> {
+fn eval_if_expression(ie: &IfExpression) -> Rc<dyn Object> {
     let condition = if let Some(condition) = ie.condition.as_ref() {
         eval_expression(condition.as_ref())
     } else {
-        Box::new(NULL)
+        Rc::new(NULL)
     };
     if Error::is_error(condition.as_ref()) {
         return condition;
@@ -134,16 +136,16 @@ fn eval_if_expression(ie: &IfExpression) -> Box<dyn Object> {
         let consequence = if let Some(consequence) = ie.consequence.as_ref() {
             consequence
         } else {
-            return Box::new(NULL);
+            return Rc::new(NULL);
         };
         return eval(consequence);
     } else if let Some(alt) = ie.alternative.as_ref() {
         return eval(alt);
     }
-    Box::new(NULL)
+    Rc::new(NULL)
 }
 
-fn is_truthy(obj: Box<dyn Object>) -> bool {
+fn is_truthy(obj: Rc<dyn Object>) -> bool {
     if let Some(boolean) = obj.as_any().downcast_ref::<BooleanObject>() {
         return boolean.value;
     }
@@ -155,9 +157,9 @@ fn is_truthy(obj: Box<dyn Object>) -> bool {
 
 fn eval_infix_expression(
     operator: &str,
-    left: Box<dyn Object>,
-    right: Box<dyn Object>,
-) -> Box<dyn Object> {
+    left: Rc<dyn Object>,
+    right: Rc<dyn Object>,
+) -> Rc<dyn Object> {
     if let Some(left) = left.as_any().downcast_ref::<Integer>() {
         if let Some(right) = right.as_any().downcast_ref::<Integer>() {
             return eval_integer_infix_expression(operator, left, right);
@@ -166,12 +168,12 @@ fn eval_infix_expression(
     if let Some(left) = left.as_any().downcast_ref::<BooleanObject>() {
         if let Some(right) = right.as_any().downcast_ref::<BooleanObject>() {
             if operator == "==" {
-                return native_bool_to_boolean_object(left == right);
+                return Rc::new(native_bool_to_boolean_object(left == right));
             }
             if operator == "!=" {
-                return native_bool_to_boolean_object(left != right);
+                return Rc::new(native_bool_to_boolean_object(left != right));
             }
-            return Box::new(Error::new(format!(
+            return Rc::new(Error::new(format!(
                 "unknown operator: {} {} {}",
                 left.type_name().to_string(),
                 operator,
@@ -179,7 +181,7 @@ fn eval_infix_expression(
             )));
         }
     }
-    Box::new(Error::new(format!(
+    Rc::new(Error::new(format!(
         "type mismatch: {} {} {}",
         left.type_name().to_string(),
         operator,
@@ -187,56 +189,56 @@ fn eval_infix_expression(
     )))
 }
 
-fn native_bool_to_boolean_object(input: bool) -> Box<dyn Object> {
+fn native_bool_to_boolean_object(input: bool) -> impl Object {
     if input {
-        return Box::new(TRUE);
+        return TRUE;
     }
-    Box::new(FALSE)
+    FALSE
 }
 
 fn eval_integer_infix_expression(
     operator: &str,
     left: &Integer,
     right: &Integer,
-) -> Box<dyn Object> {
+) -> Rc<dyn Object> {
     match operator {
-        "+" => Box::new(Integer {
+        "+" => Rc::new(Integer {
             value: left.value + right.value,
         }),
-        "-" => Box::new(Integer {
+        "-" => Rc::new(Integer {
             value: left.value - right.value,
         }),
-        "*" => Box::new(Integer {
+        "*" => Rc::new(Integer {
             value: left.value * right.value,
         }),
-        "/" => Box::new(Integer {
+        "/" => Rc::new(Integer {
             value: left.value / right.value,
         }),
         "<" => {
             if left.value < right.value {
-                return Box::new(TRUE);
+                return Rc::new(TRUE);
             }
-            Box::new(FALSE)
+            Rc::new(FALSE)
         }
         ">" => {
             if left.value > right.value {
-                return Box::new(TRUE);
+                return Rc::new(TRUE);
             }
-            Box::new(FALSE)
+            Rc::new(FALSE)
         }
         "==" => {
             if left.value == right.value {
-                return Box::new(TRUE);
+                return Rc::new(TRUE);
             }
-            Box::new(FALSE)
+            Rc::new(FALSE)
         }
         "!=" => {
             if left.value != right.value {
-                return Box::new(TRUE);
+                return Rc::new(TRUE);
             }
-            Box::new(FALSE)
+            Rc::new(FALSE)
         }
-        _ => Box::new(Error::new(format!(
+        _ => Rc::new(Error::new(format!(
             "unknown operator: {} {} {}",
             left.type_name().to_string(),
             operator,
@@ -245,11 +247,11 @@ fn eval_integer_infix_expression(
     }
 }
 
-fn eval_prefix_expression(operator: &str, right: Box<dyn Object>) -> Box<dyn Object> {
+fn eval_prefix_expression(operator: &str, right: Rc<dyn Object>) -> Rc<dyn Object> {
     match operator {
-        "!" => eval_bang_operator_expression(right),
+        "!" => Rc::new(eval_bang_operator_expression(right)),
         "-" => eval_minus_prefix_operator_expression(right),
-        _ => Box::new(Error::new(format!(
+        _ => Rc::new(Error::new(format!(
             "unknown operator: {}{}",
             operator,
             right.type_name().to_string()
@@ -257,28 +259,28 @@ fn eval_prefix_expression(operator: &str, right: Box<dyn Object>) -> Box<dyn Obj
     }
 }
 
-fn eval_bang_operator_expression(right: Box<dyn Object>) -> Box<dyn Object> {
+fn eval_bang_operator_expression(right: Rc<dyn Object>) -> impl Object {
     if let Some(boolean) = right.as_any().downcast_ref::<BooleanObject>() {
         if boolean.value {
-            return Box::new(FALSE);
+            return FALSE;
         }
-        return Box::new(TRUE);
+        return TRUE;
     }
     if let Some(integer) = right.as_any().downcast_ref::<Integer>() {
         if integer.value == 0 {
-            return Box::new(TRUE);
+            return TRUE;
         }
-        return Box::new(FALSE);
+        return FALSE;
     }
-    Box::new(FALSE)
+    FALSE
 }
 
-fn eval_minus_prefix_operator_expression(right: Box<dyn Object>) -> Box<dyn Object> {
+fn eval_minus_prefix_operator_expression(right: Rc<dyn Object>) -> Rc<dyn Object> {
     match right.as_any().downcast_ref::<Integer>() {
-        Some(integer) => Box::new(Integer {
+        Some(integer) => Rc::new(Integer {
             value: -integer.value,
         }),
-        None => Box::new(Error::new(format!(
+        None => Rc::new(Error::new(format!(
             "unknown operator: -{}",
             right.type_name().to_string()
         ))),
@@ -291,31 +293,31 @@ mod tests {
 
     use super::*;
 
-    fn test_eval(input: &str) -> Option<Box<dyn Object>> {
+    fn test_eval(input: &str) -> Option<Rc<dyn Object>> {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
 
-        println!("{}", program.to_string());
+        println!("{}", program);
 
         eval_program(&program)
     }
 
-    fn check_integer_object(obj: Box<dyn Object>, expected: i64) {
+    fn check_integer_object(obj: Rc<dyn Object>, expected: i64) {
         match obj.as_any().downcast_ref::<Integer>() {
             Some(integer) => assert_eq!(integer.value, expected),
             None => panic!("object is not Integer. got={}", obj.type_name().to_string()),
         }
     }
 
-    fn check_boolean_object(obj: Box<dyn Object>, expected: bool) {
+    fn check_boolean_object(obj: Rc<dyn Object>, expected: bool) {
         match obj.as_any().downcast_ref::<BooleanObject>() {
             Some(boolean) => assert_eq!(boolean.value, expected),
             None => panic!("object is not Boolean. got={}", obj.type_name().to_string()),
         }
     }
 
-    fn check_null_object(obj: Box<dyn Object>) {
+    fn check_null_object(obj: Rc<dyn Object>) {
         match obj.as_any().downcast_ref::<Null>() {
             Some(_) => (),
             None => panic!("object is not Null. got={}", obj.type_name().to_string()),

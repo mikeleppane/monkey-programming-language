@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::{any::Any, rc::Rc};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ObjectType {
@@ -94,7 +94,7 @@ impl Object for Null {
 }
 
 pub struct ReturnValue {
-    pub value: Box<dyn Object>,
+    pub value: Rc<dyn Object>,
 }
 
 impl Object for ReturnValue {
@@ -116,19 +116,19 @@ impl Object for ReturnValue {
 }
 
 impl ReturnValue {
-    pub fn get_return_value(&self) -> Box<dyn Object> {
+    pub fn get_return_value(&self) -> Rc<dyn Object> {
         if let Some(integer) = self.value.as_any().downcast_ref::<Integer>() {
-            return Box::new(Integer {
+            return Rc::new(Integer {
                 value: integer.value,
             });
         }
         if let Some(boolean) = self.value.as_any().downcast_ref::<Boolean>() {
-            return Box::new(Boolean {
+            return Rc::new(Boolean {
                 value: boolean.value,
             });
         }
         if self.value.as_any().downcast_ref::<Null>().is_some() {
-            return Box::new(Null {});
+            return Rc::new(Null {});
         }
         if let Some(return_value) = self.value.as_any().downcast_ref::<ReturnValue>() {
             return return_value.get_return_value();
@@ -177,9 +177,9 @@ impl Object for Error {
     }
 }
 
-impl From<&Error> for Box<dyn Object> {
+impl From<&Error> for Rc<dyn Object> {
     fn from(error: &Error) -> Self {
-        Box::new(Error {
+        Rc::new(Error {
             message: error.message.clone(),
         })
     }
