@@ -22,17 +22,24 @@ pub fn eval(node: &dyn Statement) -> Box<dyn Object> {
     if let Some(stmt) = node.as_any().downcast_ref::<BlockStatement>() {
         let mut result = None;
         for item in &stmt.statements {
-            result = Some(eval(item.as_ref()));
-            if result.as_ref().unwrap().type_name() == ObjectType::ReturnValue {
-                return result.unwrap();
+            let ret = eval(item.as_ref());
+            if ret.as_ref().type_name() == ObjectType::ReturnValue {
+                return ret;
             }
+            result = Some(ret);
         }
-        return result.unwrap();
+        if let Some(ret) = result {
+            return ret;
+        }
+        return Box::new(NULL);
     }
 
     if let Some(stmt) = node.as_any().downcast_ref::<ReturnStatement>() {
-        let value = eval_expression(stmt.return_value.as_ref().unwrap().as_ref());
-        return Box::new(ReturnValue { value });
+        if let Some(ret_value) = stmt.return_value.as_ref() {
+            let value = eval_expression(ret_value.as_ref());
+            return Box::new(ReturnValue { value });
+        }
+        return Box::new(NULL);
     }
 
     unimplemented!("{}", node.to_string());
@@ -61,13 +68,25 @@ pub fn eval_expression(node: &dyn Expression) -> Box<dyn Object> {
         return Box::new(FALSE);
     }
     if let Some(expr) = node.as_any().downcast_ref::<PrefixExpression>() {
-        let right = eval_expression(expr.right.as_ref().unwrap().as_ref());
-        return eval_prefix_expression(&expr.operator, right);
+        if let Some(right) = expr.right.as_ref() {
+            let right = eval_expression(right.as_ref());
+            return eval_prefix_expression(&expr.operator, right);
+        }
+        return Box::new(NULL);
     }
 
     if let Some(expr) = node.as_any().downcast_ref::<InfixExpression>() {
-        let right = eval_expression(expr.right.as_ref().unwrap().as_ref());
-        let left = eval_expression(expr.left.as_ref().unwrap().as_ref());
+        let right = if let Some(right) = expr.right.as_ref() {
+            eval_expression(right.as_ref())
+        } else {
+            Box::new(NULL)
+        };
+
+        let left = if let Some(left) = expr.left.as_ref() {
+            eval_expression(left.as_ref())
+        } else {
+            Box::new(NULL)
+        };
         return eval_infix_expression(&expr.operator, left, right);
     }
 
@@ -79,9 +98,18 @@ pub fn eval_expression(node: &dyn Expression) -> Box<dyn Object> {
 }
 
 fn eval_if_expression(ie: &IfExpression) -> Box<dyn Object> {
-    let condition = eval_expression(ie.condition.as_ref().unwrap().as_ref());
+    let condition = if let Some(condition) = ie.condition.as_ref() {
+        eval_expression(condition.as_ref())
+    } else {
+        Box::new(NULL)
+    };
     if is_truthy(condition) {
-        return eval(ie.consequence.as_ref().unwrap());
+        let consequence = if let Some(consequence) = ie.consequence.as_ref() {
+            consequence
+        } else {
+            return Box::new(NULL);
+        };
+        return eval(consequence);
     } else if let Some(alt) = ie.alternative.as_ref() {
         return eval(alt);
     }

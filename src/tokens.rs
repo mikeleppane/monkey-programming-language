@@ -64,23 +64,6 @@ pub enum Token {
     NOT_EQ,
 }
 
-/* impl FromStr for Token {
-    type Err = String;
-
-    fn from_str(input: &str) -> Result<Token, Self::Err> {
-        match input {
-            "=" => Ok(Token::Assign("=".to_string())),
-            "let" => Ok(Token::Let("let".to_string())),
-            "" => Ok(Token::Empty(EMPTY)),
-            ";" => Ok(Token::Semicolon(";")),
-            _ => Err(format!(
-                "Could not construct Token from the given string: {}",
-                input
-            )),
-        }
-    }
-} */
-
 impl Token {
     pub(crate) fn lookup_ident(ident: &str) -> Token {
         match ident {

@@ -36,7 +36,10 @@ impl<'a> Lexer<'a> {
                 .chars()
                 .nth(self.read_position)
                 .unwrap_or_else(|| {
-                    panic!("Cannot read character from position {}", self.read_position)
+                    panic!(
+                        "Lexer error:\n\tCannot read character from position {}\n\t{}",
+                        self.read_position, self.input
+                    )
                 })
                 .to_string()
         }

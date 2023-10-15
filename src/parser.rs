@@ -122,8 +122,9 @@ impl<'a> Parser<'a> {
             self.next_token();
             left_prefix = self.parse_infix(
                 &self.current_token.clone(),
-                left_prefix
-                    .unwrap_or_else(|| panic!("parse_expression error: prefix cannot be None!")),
+                left_prefix.unwrap_or_else(|| {
+                    panic!("Parser error:\n\tleft prefix cannot be None when parsing infix!")
+                }),
             );
         }
         left_prefix
@@ -165,18 +166,6 @@ impl<'a> Parser<'a> {
         Some(statement)
     }
 
-    /* fn current_token_matches(&self, token_literal: &str) -> bool {
-           let token = Token::from_str(token_literal);
-           match token {
-               Ok(found_token) => self.current_token.matches(&found_token),
-               Err(_) => false,
-           }
-       }
-
-       fn peek_token_matches(&self, token: &Token) -> bool {
-           self.peek_token.matches(token)
-       }
-    */
     fn expect_peek(&mut self, token: &Token) -> bool {
         match self.peek_token.matches(token) {
             true => {
@@ -400,7 +389,11 @@ impl<'a> Parser<'a> {
         arguments.push(
             self.parse_expression(Precedences::Lowest)
                 .unwrap_or_else(|| {
-                    panic!("parse_call_arguments error: expression cannot be None!")
+                    panic!(
+                        "Parser error:\n\tFunction call argument cannot be None! 
+                    \n\tToken: {:?}",
+                        self.current_token
+                    )
                 }),
         );
         while matches!(self.peek_token, Token::Comma) {
@@ -409,7 +402,11 @@ impl<'a> Parser<'a> {
             arguments.push(
                 self.parse_expression(Precedences::Lowest)
                     .unwrap_or_else(|| {
-                        panic!("parse_call_arguments error: expression cannot be None!")
+                        panic!(
+                            "Parser error:\n\tFunction call argument cannot be None! 
+                        \n\tToken: {:?}",
+                            self.current_token
+                        )
                     }),
             );
         }

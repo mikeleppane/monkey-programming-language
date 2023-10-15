@@ -39,6 +39,13 @@ pub fn start() {
     print_welcome();
     print_prompt();
     for line_result in stdin.lock().lines() {
+        if line_result.is_err() {
+            println!("🐒");
+            println!("Woops! We ran into some monkey business here!");
+            println!("\t{}", line_result.unwrap_err());
+            print_prompt();
+            continue;
+        }
         let line = line_result.unwrap();
         let line_trimmed = line.trim();
         if line_trimmed == EXIT {

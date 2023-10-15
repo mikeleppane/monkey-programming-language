@@ -131,6 +131,10 @@ impl ReturnValue {
         if let Some(return_value) = self.value.as_any().downcast_ref::<ReturnValue>() {
             return return_value.get_return_value();
         }
-        panic!("unreachable");
+        unreachable!(
+            "Could not get return value from object ({}): {}",
+            self.type_name().to_string(),
+            self.to_string()
+        )
     }
 }
