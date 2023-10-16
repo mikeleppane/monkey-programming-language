@@ -1,4 +1,4 @@
-use std::{any::Any, rc::Rc};
+use std::{any::Any, cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ObjectType {
@@ -182,5 +182,44 @@ impl From<&Error> for Rc<dyn Object> {
         Rc::new(Error {
             message: error.message.clone(),
         })
+    }
+}
+
+pub struct Environment {
+    store: HashMap<String, Rc<dyn Object>>,
+    outer: Option<Rc<RefCell<Environment>>>,
+}
+
+impl Environment {
+    pub fn new() -> Self {
+        Environment {
+            store: HashMap::new(),
+            outer: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn new_enclosed_environment(outer: Rc<RefCell<Environment>>) -> Self {
+        Environment {
+            store: HashMap::new(),
+            outer: Some(outer),
+        }
+    }
+
+    pub fn get(&self, name: &str) -> Option<Rc<dyn Object>> {
+        if let Some(object) = self.store.get(name) {
+            return Some(object.clone());
+        }
+
+        if let Some(outer) = &self.outer {
+            return outer.borrow().get(name);
+        }
+
+        None
+    }
+
+    pub fn set(&mut self, name: &str, value: Rc<dyn Object>) -> Rc<dyn Object> {
+        self.store.insert(name.to_string(), value.clone());
+        value
     }
 }

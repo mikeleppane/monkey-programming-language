@@ -1,5 +1,6 @@
 use crate::evaluator::eval_program;
 use crate::lexer::Lexer;
+use crate::object::Environment;
 use crate::parser::Parser;
 use std::io::prelude::*;
 use std::{env, io};
@@ -36,6 +37,7 @@ fn print_prompt() {
 
 pub fn start() {
     let stdin = io::stdin();
+    let mut env = Environment::new();
     print_welcome();
     print_prompt();
     for line_result in stdin.lock().lines() {
@@ -65,7 +67,7 @@ pub fn start() {
             print_prompt();
             continue;
         }
-        let evaluated = eval_program(&program);
+        let evaluated = eval_program(&program, &mut env);
         if let Some(evaluated) = evaluated {
             println!("🐵");
             println!("{}", evaluated.inspect());

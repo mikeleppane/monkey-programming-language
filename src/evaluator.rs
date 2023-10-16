@@ -1,32 +1,33 @@
 use std::rc::Rc;
 
 use crate::ast::{
-    BlockStatement, Boolean, Expression, ExpressionStatement, IfExpression, InfixExpression,
-    IntegerLiteral, PrefixExpression, Program, ReturnStatement, Statement,
+    BlockStatement, Boolean, Expression, ExpressionStatement, Identifier, IfExpression,
+    InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program, ReturnStatement,
+    Statement,
 };
 use crate::object::{
-    Boolean as BooleanObject, Error, Integer, Null, Object, ObjectType, ReturnValue,
+    Boolean as BooleanObject, Environment, Error, Integer, Null, Object, ObjectType, ReturnValue,
 };
 
 const TRUE: BooleanObject = BooleanObject { value: true };
 const FALSE: BooleanObject = BooleanObject { value: false };
 const NULL: Null = Null {};
 
-pub fn eval_program(program: &Program) -> Option<Rc<dyn Object>> {
-    eval_statements(&program.statements)
+pub fn eval_program(program: &Program, env: &mut Environment) -> Option<Rc<dyn Object>> {
+    eval_statements(&program.statements, env)
 }
 
-pub fn eval(node: &dyn Statement) -> Rc<dyn Object> {
+pub fn eval(node: &dyn Statement, env: &mut Environment) -> Rc<dyn Object> {
     if let Some(expr) = node.as_any().downcast_ref::<ExpressionStatement>() {
         if let Some(expr) = expr.expression.as_ref() {
-            return eval_expression(expr.as_ref());
+            return eval_expression(expr.as_ref(), env);
         }
     }
 
     if let Some(stmt) = node.as_any().downcast_ref::<BlockStatement>() {
         let mut result = None;
         for item in &stmt.statements {
-            let ret = eval(item.as_ref());
+            let ret = eval(item.as_ref(), env);
             if ret.as_ref().type_name() == ObjectType::ReturnValue
                 || ret.as_ref().type_name() == ObjectType::Error
             {
@@ -42,7 +43,7 @@ pub fn eval(node: &dyn Statement) -> Rc<dyn Object> {
 
     if let Some(stmt) = node.as_any().downcast_ref::<ReturnStatement>() {
         if let Some(ret_value) = stmt.return_value.as_ref() {
-            let value = eval_expression(ret_value.as_ref());
+            let value = eval_expression(ret_value.as_ref(), env);
             if Error::is_error(value.as_ref()) {
                 return value;
             }
@@ -50,16 +51,30 @@ pub fn eval(node: &dyn Statement) -> Rc<dyn Object> {
         }
         return Rc::new(Error::new("return statement is empty".to_string()));
     }
+
+    if let Some(stmt) = node.as_any().downcast_ref::<LetStatement>() {
+        if let Some(value) = stmt.value.as_ref() {
+            let value = eval_expression(value.as_ref(), env);
+            if Error::is_error(value.as_ref()) {
+                return value;
+            }
+            return env.set(&stmt.name.value, value);
+        }
+    }
+
     Rc::new(Error::new(format!(
         "unimplemented Statement: {:?}",
         node.to_string()
     )))
 }
 
-fn eval_statements(stmts: &Vec<Box<dyn Statement>>) -> Option<Rc<dyn Object>> {
+fn eval_statements(
+    stmts: &Vec<Box<dyn Statement>>,
+    env: &mut Environment,
+) -> Option<Rc<dyn Object>> {
     let mut result = None;
     for statement in stmts {
-        let ret = eval(statement.as_ref());
+        let ret = eval(statement.as_ref(), env);
         if let Some(ret_value) = ret.as_any().downcast_ref::<ReturnValue>() {
             return Some(ret_value.get_return_value());
         }
@@ -71,7 +86,7 @@ fn eval_statements(stmts: &Vec<Box<dyn Statement>>) -> Option<Rc<dyn Object>> {
     result
 }
 
-pub fn eval_expression(node: &dyn Expression) -> Rc<dyn Object> {
+pub fn eval_expression(node: &dyn Expression, env: &mut Environment) -> Rc<dyn Object> {
     if let Some(expr) = node.as_any().downcast_ref::<IntegerLiteral>() {
         return Rc::new(Integer { value: expr.value });
     }
@@ -83,7 +98,7 @@ pub fn eval_expression(node: &dyn Expression) -> Rc<dyn Object> {
     }
     if let Some(expr) = node.as_any().downcast_ref::<PrefixExpression>() {
         if let Some(right) = expr.right.as_ref() {
-            let right = eval_expression(right.as_ref());
+            let right = eval_expression(right.as_ref(), env);
             if Error::is_error(right.as_ref()) {
                 return right;
             }
@@ -94,7 +109,7 @@ pub fn eval_expression(node: &dyn Expression) -> Rc<dyn Object> {
 
     if let Some(expr) = node.as_any().downcast_ref::<InfixExpression>() {
         let right = if let Some(right) = expr.right.as_ref() {
-            eval_expression(right.as_ref())
+            eval_expression(right.as_ref(), env)
         } else {
             Rc::new(Error::new("right expression is empty".to_string()))
         };
@@ -106,7 +121,7 @@ pub fn eval_expression(node: &dyn Expression) -> Rc<dyn Object> {
             if Error::is_error(right.as_ref()) {
                 return right;
             }
-            eval_expression(left.as_ref())
+            eval_expression(left.as_ref(), env)
         } else {
             Rc::new(Error::new("left expression is empty".to_string()))
         };
@@ -116,16 +131,23 @@ pub fn eval_expression(node: &dyn Expression) -> Rc<dyn Object> {
         return eval_infix_expression(&expr.operator, left, right);
     }
 
+    if let Some(expr) = node.as_any().downcast_ref::<Identifier>() {
+        if let Some(obj) = env.get(&expr.value) {
+            return obj;
+        }
+        return Rc::new(Error::new(format!("identifier not found: {}", expr.value)));
+    }
+
     if let Some(expr) = node.as_any().downcast_ref::<IfExpression>() {
-        return eval_if_expression(expr);
+        return eval_if_expression(expr, env);
     }
 
     unreachable!("unimplemented Expression: {:?}", node.to_string())
 }
 
-fn eval_if_expression(ie: &IfExpression) -> Rc<dyn Object> {
+fn eval_if_expression(ie: &IfExpression, env: &mut Environment) -> Rc<dyn Object> {
     let condition = if let Some(condition) = ie.condition.as_ref() {
-        eval_expression(condition.as_ref())
+        eval_expression(condition.as_ref(), env)
     } else {
         Rc::new(NULL)
     };
@@ -138,9 +160,9 @@ fn eval_if_expression(ie: &IfExpression) -> Rc<dyn Object> {
         } else {
             return Rc::new(NULL);
         };
-        return eval(consequence);
+        return eval(consequence, env);
     } else if let Some(alt) = ie.alternative.as_ref() {
-        return eval(alt);
+        return eval(alt, env);
     }
     Rc::new(NULL)
 }
@@ -297,10 +319,11 @@ mod tests {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
+        let mut env = Environment::new();
 
         println!("{}", program);
 
-        eval_program(&program)
+        eval_program(&program, &mut env)
     }
 
     fn check_integer_object(obj: Rc<dyn Object>, expected: i64) {
@@ -483,6 +506,7 @@ mod tests {
                 "if (10 > 1) { if (10 > 1) {return true + false;} return 1;}",
                 "unknown operator: BOOLEAN + BOOLEAN",
             ),
+            ("foobar", "identifier not found: foobar"),
         ];
 
         for (input, expected) in tests {
@@ -495,6 +519,25 @@ mod tests {
                         evaluated.type_name().to_string()
                     ),
                 }
+            } else {
+                panic!("evaluated is None")
+            }
+        }
+    }
+
+    #[test]
+    fn test_let_statements() {
+        let tests = vec![
+            ("let a = 5; a;", 5),
+            ("let a = 5 * 5; a;", 25),
+            ("let a = 5; let b = a; b;", 5),
+            ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
+        ];
+
+        for (input, expected) in tests {
+            let evaluated = test_eval(input);
+            if let Some(evaluated) = evaluated {
+                check_integer_object(evaluated, expected);
             } else {
                 panic!("evaluated is None")
             }
